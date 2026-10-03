@@ -6,7 +6,7 @@ import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
-import { getClass, OWN_CLASS_ID } from "@/lib/mock";
+import { getAccountRows, getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
@@ -14,7 +14,6 @@ import { btn, field, StatCard, StatusBadge } from "./ui";
 
 // Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
 // dan pembatasan aksesnya tetap dipaksakan di backend.
-const KETUA_NAME = "Aisyah Putri";
 const PRESENT: Status[] = ["HADIR", "TERLAMBAT"];
 
 type DialogState = { kind: "form" | "detail" | "delete"; nis?: string } | null;
@@ -89,6 +88,7 @@ function PresensiForm({ options, target, onSubmit, onCancel }: FormProps) {
 
 export function KetuaKelasDashboard() {
   const kelas = getClass(OWN_CLASS_ID);
+  const ketuaName = getAccountRows().find((account) => account.role === "KETUA_KELAS" && account.kelasId === OWN_CLASS_ID)?.nama ?? "Ketua Kelas";
   const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const [date] = useState(getLocalDateKey);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
@@ -165,7 +165,7 @@ export function KetuaKelasDashboard() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{kelas?.nama}</h1>
-          <p className="text-sm text-muted">Ketua Kelas: {KETUA_NAME}</p>
+          <p className="text-sm text-muted">Ketua Kelas: {ketuaName}</p>
         </div>
         <div className="hidden gap-2 lg:flex">{actionButtons}</div>
       </div>

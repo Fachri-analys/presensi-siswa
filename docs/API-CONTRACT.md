@@ -101,7 +101,7 @@ Jangan menerima `role` dari body login. Jika seorang pengguna dapat mengelola be
 Contoh body kelas:
 
 ```json
-{ "nama": "XI TKJ 1", "jurusan": "Teknik Komputer dan Jaringan" }
+{ "nama": "XI PPLG 1", "jurusan": "Pengembangan Perangkat Lunak dan Gim" }
 ```
 
 Contoh penetapan Ketua Kelas:

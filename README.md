@@ -133,7 +133,7 @@ Admin memiliki akses ke semua halaman, tetapi aktivitas pencatatan presensi teta
 
 Tabel di atas adalah **aturan produk yang dituju**, bukan jaminan keamanan yang sudah diterapkan. Role saat ini disimulasikan oleh pilihan pada halaman masuk dan disimpan di `sessionStorage`. Pemeriksaan akses `RoleGate`, menu navigasi, dan filter kelas hanya membatasi tampilan browser. Backend wajib menolak permintaan yang tidak berizin, termasuk jika seseorang memanggil API langsung atau mengubah data di browser.
 
-Ketua Kelas demo saat ini memakai kelas tetap `XI TKJ 1` (`OWN_CLASS_ID`) dan nama tetap di komponen. Setelah backend tersedia, kelas, nama, dan hak akses harus berasal dari profil/sesi akun, bukan konstanta frontend.
+Ketua Kelas demo saat ini memakai kelas tetap `XI PPLG 1` (`OWN_CLASS_ID`) dan identitas akun contoh. Setelah backend tersedia, kelas, nama, dan hak akses harus berasal dari profil/sesi akun, bukan konstanta frontend.
 
 ## Fitur dan alur kerja
 

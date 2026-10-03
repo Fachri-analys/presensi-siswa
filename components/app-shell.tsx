@@ -6,11 +6,12 @@ import { createContext, useContext, useEffect, useState, useSyncExternalStore, t
 import { Activity, ClipboardCheck, FileText, History, LayoutDashboard, LogOut, Menu, School, SlidersHorizontal, Users, X, type LucideIcon } from "lucide-react";
 import { addDemoActivity } from "@/lib/activity-log";
 import { clearDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot, subscribeToDemoSession } from "@/lib/demo-session";
+import { getClass, OWN_CLASS_ID } from "@/lib/mock";
 import type { Role } from "@/lib/types";
 import { Logo } from "./logo";
 
 const ROLES: Record<Role, { label: string; note: string; initials: string }> = {
-  KETUA_KELAS: { label: "Ketua Kelas", note: "Kelas XI TKJ 1", initials: "KK" },
+  KETUA_KELAS: { label: "Ketua Kelas", note: "Kelas tugas", initials: "KK" },
   GURU_PIKET: { label: "Guru Piket", note: "Akses seluruh kelas", initials: "GP" },
   ADMIN: { label: "Admin", note: "Akses penuh seluruh fitur", initials: "AD" },
 };
@@ -121,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="mt-auto rounded-[8px] bg-sidebar-chip p-4">
             <p className="text-sm font-semibold text-white">{ROLES[role].label}</p>
-            <p className="text-xs text-white/65">{ROLES[role].note}</p>
+            <p className="text-xs text-white/65">{role === "KETUA_KELAS" ? getClass(OWN_CLASS_ID)?.nama ?? ROLES[role].note : ROLES[role].note}</p>
           </div>
         </aside>
 

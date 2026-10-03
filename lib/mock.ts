@@ -3,14 +3,14 @@ import type { AccountRow, ClassSummary, HistoryRow, KelasRow, RecapRow, Status, 
 // Data contoh. Ganti isi fungsi di file ini dengan pemanggilan API yang sudah ada;
 // komponen UI hanya bergantung pada signature-nya.
 const CLASSES: ClassSummary[] = [
-  { id: "x-tkj-1", nama: "X TKJ 1", jurusan: "Teknik Komputer & Jaringan", siswa: 36, hadir: 33, izin: 1, sakit: 1, alpa: 1, terlambat: 2 },
-  { id: "x-tkj-2", nama: "X TKJ 2", jurusan: "Teknik Komputer & Jaringan", siswa: 35, hadir: 31, izin: 2, sakit: 1, alpa: 1, terlambat: 1 },
-  { id: "xi-tkj-1", nama: "XI TKJ 1", jurusan: "Teknik Komputer & Jaringan", siswa: 32, hadir: 28, izin: 1, sakit: 2, alpa: 1, terlambat: 3 },
-  { id: "xi-tkj-2", nama: "XI TKJ 2", jurusan: "Teknik Komputer & Jaringan", siswa: 33, hadir: 25, izin: 2, sakit: 1, alpa: 0, terlambat: 1 },
-  { id: "xi-rpl-1", nama: "XI RPL 1", jurusan: "Rekayasa Perangkat Lunak", siswa: 34, hadir: 30, izin: 1, sakit: 1, alpa: 2, terlambat: 2 },
-  { id: "xii-tkj-1", nama: "XII TKJ 1", jurusan: "Teknik Komputer & Jaringan", siswa: 31, hadir: 0, izin: 0, sakit: 0, alpa: 0, terlambat: 0 },
-  { id: "xii-rpl-1", nama: "XII RPL 1", jurusan: "Rekayasa Perangkat Lunak", siswa: 30, hadir: 27, izin: 1, sakit: 1, alpa: 1, terlambat: 1 },
-  { id: "xii-akl-1", nama: "XII AKL 1", jurusan: "Akuntansi & Keuangan Lembaga", siswa: 35, hadir: 20, izin: 2, sakit: 1, alpa: 0, terlambat: 0 },
+  { id: "x-pplg-1", nama: "X PPLG 1", jurusan: "Pengembangan Perangkat Lunak dan Gim", siswa: 36, hadir: 33, izin: 1, sakit: 1, alpa: 1, terlambat: 2 },
+  { id: "x-pplg-2", nama: "X PPLG 2", jurusan: "Pengembangan Perangkat Lunak dan Gim", siswa: 35, hadir: 31, izin: 2, sakit: 1, alpa: 1, terlambat: 1 },
+  { id: "xi-pplg-1", nama: "XI PPLG 1", jurusan: "Pengembangan Perangkat Lunak dan Gim", siswa: 32, hadir: 28, izin: 1, sakit: 2, alpa: 1, terlambat: 3 },
+  { id: "xi-tkt-1", nama: "XI TKT 1", jurusan: "Teknik Jaringan Komputer dan Telekomunikasi", siswa: 33, hadir: 25, izin: 2, sakit: 1, alpa: 0, terlambat: 1 },
+  { id: "xi-dkv-1", nama: "XI DKV 1", jurusan: "Desain Komunikasi Visual", siswa: 34, hadir: 30, izin: 1, sakit: 1, alpa: 2, terlambat: 2 },
+  { id: "xii-animasi-1", nama: "XII ANIMASI 1", jurusan: "Animasi", siswa: 31, hadir: 0, izin: 0, sakit: 0, alpa: 0, terlambat: 0 },
+  { id: "xii-broadcasting-1", nama: "XII BROADCASTING 1", jurusan: "Broadcasting dan Perfilman", siswa: 30, hadir: 27, izin: 1, sakit: 1, alpa: 1, terlambat: 1 },
+  { id: "xii-mplb-1", nama: "XII MPLB 1", jurusan: "Manajemen Perkantoran dan Layanan Bisnis", siswa: 35, hadir: 20, izin: 2, sakit: 1, alpa: 0, terlambat: 0 },
 ];
 
 const FIRST = ["Ahmad", "Bagas", "Citra", "Dimas", "Eka", "Fajar", "Gita", "Hendra", "Intan", "Joko", "Kirana", "Lukman"];
@@ -64,20 +64,20 @@ export function getRecap(classId: string, days: number): RecapRow[] {
   });
 }
 
-export const OWN_CLASS_ID = "xi-tkj-1";
+export const OWN_CLASS_ID = "xi-pplg-1";
 
 export const getStudentRows = (): StudentRow[] =>
   CLASSES.flatMap((c) => getStudents(c.id).map((s) => ({ id: `s-${s.nis}`, nis: s.nis, nama: s.nama, kelasId: c.id })));
 
 /** `ketua` berisi NIS siswa; kosong = belum ditentukan. */
 export const getKelasRows = (): KelasRow[] =>
-  CLASSES.map((c) => ({ id: c.id, nama: c.nama, jurusan: c.jurusan, ketua: c.id === "xii-tkj-1" ? "" : getStudents(c.id)[0].nis }));
+  CLASSES.map((c) => ({ id: c.id, nama: c.nama, jurusan: c.jurusan, ketua: c.id === "xii-animasi-1" ? "" : getStudents(c.id)[0].nis }));
 
 export const getAccountRows = (): AccountRow[] => [
   { id: "a1", nama: "Admin Sekolah", email: "admin@smkn11jakarta.sch.id", role: "ADMIN", kelasId: "" },
   { id: "a2", nama: "Guru Piket Senin", email: "piket.senin@smkn11jakarta.sch.id", role: "GURU_PIKET", kelasId: "" },
-  { id: "a3", nama: "Aisyah Putri", email: "aisyah.putri@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: "xi-tkj-1" },
-  { id: "a4", nama: "Rizky Ramadhan", email: "rizky.ramadhan@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: "xi-rpl-1" },
+  { id: "a3", nama: "Aisyah Putri", email: "aisyah.putri@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: OWN_CLASS_ID },
+  { id: "a4", nama: "Rizky Ramadhan", email: "rizky.ramadhan@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: "xi-dkv-1" },
 ];
 
 /** Riwayat harian (Senin-Jumat), terbaru di atas. Maksimal 92 hari agar tabel tetap ringan. */
