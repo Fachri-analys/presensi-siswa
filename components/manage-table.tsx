@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { addDemoActivity } from "@/lib/activity-log";
+import { createId } from "@/lib/id";
 import { Dialog } from "./dialog";
 import { btn, card, EmptyState, field, Pagination } from "./ui";
 
@@ -139,7 +140,7 @@ export function ManageTable<T extends Row>({ noun, initialRows, columns, fields,
     }
     const nextRows = target
       ? rows.map((row) => row.id === target.id ? { ...row, ...values } : row)
-      : [...rows, { id: crypto.randomUUID(), ...values } as T];
+      : [...rows, { id: createId(), ...values } as T];
     if (!saveRows(nextRows)) return;
     addDemoActivity(
       `Data ${noun} ${target ? "diperbarui" : "ditambahkan"}`,

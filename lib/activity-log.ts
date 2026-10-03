@@ -1,5 +1,7 @@
 "use client";
 
+import { createId } from "./id";
+
 export interface ActivityLogEntry {
   id: string;
   createdAt: string;
@@ -54,20 +56,20 @@ export function subscribeToDemoActivityLogs(listener: () => void) {
 }
 
 export function addDemoActivity(action: string, description: string) {
-  loadEntries();
-  const entry: ActivityLogEntry = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    action,
-    description,
-  };
-  entries = [entry, ...entries].slice(0, 100);
-  if (typeof window !== "undefined") {
-    try {
+  try {
+    loadEntries();
+    const entry: ActivityLogEntry = {
+      id: createId(),
+      createdAt: new Date().toISOString(),
+      action,
+      description,
+    };
+    entries = [entry, ...entries].slice(0, 100);
+    if (typeof window !== "undefined") {
       window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch (error) {
-      console.error("Log aktivitas hanya tersimpan selama halaman ini dibuka.", error);
     }
+    notify();
+  } catch (error) {
+    console.error("Log aktivitas demo tidak dapat ditambahkan.", error);
   }
-  notify();
 }

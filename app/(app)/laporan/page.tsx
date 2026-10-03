@@ -5,7 +5,7 @@ import { Download, FileSpreadsheet } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { btn, card, EmptyState, field } from "@/components/ui";
 import { getClasses, getRecap } from "@/lib/mock";
-import { currentMonthRange, pct, workDays } from "@/lib/stats";
+import { currentMonthRange, isValidDateRange, pct, workDays } from "@/lib/stats";
 import { STATUS_LABEL, type Status } from "@/lib/types";
 import { useRole } from "@/components/app-shell";
 import { OWN_CLASS_ID } from "@/lib/mock";
@@ -40,6 +40,7 @@ export default function LaporanPage() {
   const options = visibleClasses.filter((c) => !jurusan || c.jurusan === jurusan);
   const kelas = options.find((c) => c.id === kelasId) ?? options[0];
   const days = workDays(from, to);
+  const invalidDateRange = !isValidDateRange(from, to);
   const storedRecap = getStoredAttendanceRecap(attendanceStore, kelas.id, from, to, demoStudents);
   const isExampleData = storedRecap === null;
   const reportDays = storedRecap?.days ?? days;
@@ -304,7 +305,7 @@ export default function LaporanPage() {
           </p>
         )}
         {!ready ? (
-          <EmptyState title="Laporan belum bisa dibuat" description="Pastikan rentang tanggal valid (mencakup hari kerja) dan ada siswa yang sesuai filter." />
+          <EmptyState title={invalidDateRange ? "Rentang tanggal tidak valid" : "Laporan belum bisa dibuat"} description={invalidDateRange ? "Pilih rentang tanggal yang benar, maksimal 366 hari." : "Pastikan rentang tanggal mencakup hari kerja dan ada siswa yang sesuai filter."} />
         ) : (
           <>
             <header className="flex items-center gap-4 border-b-2 border-primary pb-4">

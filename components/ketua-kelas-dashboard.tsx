@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
+import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
 import { getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
@@ -19,7 +19,6 @@ const PRESENT: Status[] = ["HADIR", "TERLAMBAT"];
 
 type DialogState = { kind: "form" | "detail" | "delete"; nis?: string } | null;
 
-const nowTime = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
 const isStatus = (value: string): value is Status => Object.hasOwn(STATUS_LABEL, value);
 
 function IconButton({ label, onClick, danger, disabled, children }: { label: string; onClick: () => void; danger?: boolean; disabled?: boolean; children: ReactNode }) {
@@ -130,7 +129,7 @@ export function KetuaKelasDashboard() {
   function save(nis: string, status: Status, keterangan: string) {
     const previous = savedAttendance[nis];
     const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
-    records[nis] = { status, keterangan, waktu: PRESENT.includes(status) ? (previous?.waktu ?? nowTime()) : null };
+    records[nis] = { status, keterangan, waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null };
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
       setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;

@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { addDemoActivity } from "@/lib/activity-log";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
+import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getClasses } from "@/lib/mock";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
@@ -60,7 +60,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
       next[nis] = {
         status,
         waktu: status === "HADIR" || status === "TERLAMBAT"
-          ? (next[nis]?.waktu ?? new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(":", "."))
+          ? (next[nis]?.waktu ?? getLocalTime())
           : null,
         keterangan: next[nis]?.keterangan ?? "",
       };

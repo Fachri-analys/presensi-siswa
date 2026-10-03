@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { addDemoActivity } from "@/lib/activity-log";
+import { createId } from "@/lib/id";
 import { getDemoTeachers, getDemoTeachersServerSnapshot, subscribeToDemoTeachers, updateDemoTeachers, type DemoTeacher } from "@/lib/demo-teachers";
 import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 import { Dialog } from "./dialog";
@@ -49,7 +50,7 @@ export function AdminTeachers() {
       addDemoActivity("Data guru diperbarui", `Admin memperbarui data ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil diperbarui.`);
     } else {
-      updateDemoTeachers((previous) => [{ id: `g-${crypto.randomUUID()}`, nip, nama, status: "active" }, ...previous]);
+      updateDemoTeachers((previous) => [{ id: `g-${createId()}`, nip, nama, status: "active" }, ...previous]);
       addDemoActivity("Data guru ditambahkan", `Admin menambahkan ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil ditambahkan.`);
     }

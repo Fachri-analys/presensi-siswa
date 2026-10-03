@@ -7,7 +7,7 @@ import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { btn, card, EmptyState, field, Pagination } from "@/components/ui";
 import { getClasses, getHistory, getClass, OWN_CLASS_ID } from "@/lib/mock";
-import { currentMonthRange, pct } from "@/lib/stats";
+import { currentMonthRange, isValidDateRange, pct } from "@/lib/stats";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceHistory, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 
@@ -25,6 +25,7 @@ function RiwayatContent() {
   const [kelasId, setKelasId] = useState(initialClassId);
   const [from, setFrom] = useState(period.from);
   const [to, setTo] = useState(period.to);
+  const invalidDateRange = !isValidDateRange(from, to);
   const [page, setPage] = useState(1);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
@@ -57,7 +58,7 @@ function RiwayatContent() {
           </div>
           {kelas && <p className="rounded-full bg-primary-soft px-3 py-1 text-sm font-semibold text-primary">{kelas.nama}</p>}
         </div>
-        {!storedRows.length && (
+        {!invalidDateRange && !storedRows.length && (
           <p role="note" className="rounded-md border border-warning px-4 py-3 text-sm font-semibold text-warning">
             Data contoh, bukan data resmi
           </p>
@@ -99,7 +100,7 @@ function RiwayatContent() {
 
         <div className={`${card} overflow-hidden`}>
           {rows.length === 0 ? (
-            <EmptyState title="Belum ada riwayat" description="Tidak ada data hari kerja pada rentang tanggal yang dipilih." />
+            <EmptyState title={invalidDateRange ? "Rentang tanggal tidak valid" : "Belum ada riwayat"} description={invalidDateRange ? "Pilih rentang tanggal yang benar, maksimal 366 hari." : "Tidak ada data hari kerja pada rentang tanggal yang dipilih."} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-176 text-sm">
