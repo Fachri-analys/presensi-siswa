@@ -49,12 +49,12 @@ export function MonitoringClassDetail({ classId }: { classId: string }) {
   }
 
   return (
-    <RoleGate allow={["GURU_PIKET"]}>
+    <RoleGate allow={["KETUA_KELAS", "GURU_PIKET"]}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-muted">
-              <Link href="/dashboard" className="hover:underline">Monitoring</Link> / Detail Kelas
+              <Link href={role === "KETUA_KELAS" ? "/dashboard" : "/monitoring"} className="hover:underline">Monitoring</Link> / Detail Kelas
             </p>
             <h1 className="text-2xl font-semibold leading-tight">{kelas.nama}</h1>
             <p className="text-sm text-muted">Jumlah siswa: {summary.siswa} · Data presensi hari ini</p>

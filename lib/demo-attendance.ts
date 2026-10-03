@@ -63,7 +63,10 @@ export function getStoredAttendanceRecap(
   const days = getClassDays(store, classId, from, to);
   if (!days.length) return null;
   const rows = students
-    .filter((student) => student.kelasId === classId && student.status === "active")
+    .filter((student) =>
+      student.kelasId === classId &&
+      (student.status === "active" || days.some(({ records }) => Object.hasOwn(records, student.nis)))
+    )
     .map((student) => {
       const counts = { hadir: 0, izin: 0, sakit: 0, alpa: 0, terlambat: 0 };
       for (const { records } of days) {

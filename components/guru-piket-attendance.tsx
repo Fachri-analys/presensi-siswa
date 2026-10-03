@@ -70,7 +70,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
   }
 
   function saveAttendance() {
-    if (!kelas || done === 0) return;
+    if (!kelas || draft === null) return;
     if (!saveDemoAttendance(classId, date, attendance)) {
       setMessage("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;
@@ -100,7 +100,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Tanggal presensi
-          <input type="date" value={date} onChange={(event) => {
+          <input type="date" value={date} max={getLocalDateKey()} onChange={(event) => {
             if (!event.target.value || event.target.value === date) return;
             if (draft && !window.confirm("Perubahan yang belum disimpan akan dibuang. Lanjutkan?")) return;
             setDate(event.target.value);
@@ -127,7 +127,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         <label className={`${field} flex flex-1 items-center gap-2`}>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS siswa" aria-label="Cari siswa dalam kelas" className="w-full bg-transparent outline-none" />
         </label>
-        <button type="button" onClick={saveAttendance} disabled={done === 0} className={`${btn.primary} w-full sm:w-auto`}>
+        <button type="button" onClick={saveAttendance} disabled={draft === null} className={`${btn.primary} w-full sm:w-auto`}>
           Simpan presensi{done > 0 ? ` (${done} siswa)` : ""}
         </button>
       </div>

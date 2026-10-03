@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { btn, card, EmptyState, field, Pagination } from "@/components/ui";
@@ -15,10 +16,13 @@ const CELL = "px-4 py-3";
 const classes = getClasses();
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-export default function RiwayatPage() {
+function RiwayatContent() {
   const { role } = useRole();
+  const searchParams = useSearchParams();
+  const requestedClassId = searchParams.get("kelas");
+  const initialClassId = classes.some((kelas) => kelas.id === requestedClassId) ? requestedClassId! : OWN_CLASS_ID;
   const [period] = useState(currentMonthRange);
-  const [kelasId, setKelasId] = useState(OWN_CLASS_ID);
+  const [kelasId, setKelasId] = useState(initialClassId);
   const [from, setFrom] = useState(period.from);
   const [to, setTo] = useState(period.to);
   const [page, setPage] = useState(1);
@@ -61,7 +65,7 @@ export default function RiwayatPage() {
 
         <section aria-label="Ringkasan riwayat" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Hari efektif", value: rows.length, note: "hari sekolah dalam periode" },
+            { label: "Hari tercatat", value: rows.length, note: "hari dengan catatan presensi tersimpan" },
             { label: "Rata-rata kehadiran", value: `${attendanceRate}%`, note: "termasuk siswa terlambat" },
             { label: "Total terlambat", value: totalFor("terlambat"), note: "catatan keterlambatan" },
             { label: "Perlu tindak lanjut", value: followUpCount, note: "izin, sakit, dan alpa" },
@@ -137,5 +141,13 @@ export default function RiwayatPage() {
         </div>
       </div>
     </RoleGate>
+  );
+}
+
+export default function RiwayatPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted">Memuat riwayat presensi…</p>}>
+      <RiwayatContent />
+    </Suspense>
   );
 }
