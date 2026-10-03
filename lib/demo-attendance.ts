@@ -25,7 +25,8 @@ function getClassDays(store: AttendanceStore, classId: string, from: string, to:
     .flatMap(([key, records]) => {
       const separator = key.indexOf("::");
       const date = key.slice(0, separator);
-      return key.slice(separator + 2) === classId && date >= from && date <= to && Object.keys(records).length
+      return key.slice(separator + 2) === classId && date >= from && date <= to &&
+        Object.values(records).some(({ status }) => status !== null)
         ? [{ date, records }]
         : [];
     })
@@ -132,7 +133,7 @@ export function getStoredClassSummary(
   activeStudentNis: string[],
 ): Pick<ClassSummary, "siswa" | "hadir" | "izin" | "sakit" | "alpa" | "terlambat"> | null {
   const records = store[storeKey(classId, date)];
-  if (!records || !Object.keys(records).length) return null;
+  if (!records || !Object.values(records).some(({ status }) => status !== null)) return null;
   const activeNis = new Set(activeStudentNis);
   const counts = { siswa: activeStudentNis.length, hadir: 0, izin: 0, sakit: 0, alpa: 0, terlambat: 0 };
   for (const [nis, { status }] of Object.entries(records)) {

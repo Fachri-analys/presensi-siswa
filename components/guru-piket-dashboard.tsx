@@ -26,7 +26,7 @@ export function GuruPiketDashboard() {
   const todayClasses = classes.map((kelas) => {
     const activeNis = students.filter((student) => student.kelasId === kelas.id && student.status === "active").map((student) => student.nis);
     const summary = getStoredClassSummary(attendanceStore, kelas.id, today, activeNis);
-    return summary ? { ...kelas, ...summary } : kelas;
+    return summary ? { ...kelas, ...summary, isExample: false } : { ...kelas, isExample: true };
   });
   const sum = (pick: (c: ClassSummary) => number) => todayClasses.reduce((total, c) => total + pick(c), 0);
   const [query, setQuery] = useState("");
@@ -87,6 +87,11 @@ export function GuruPiketDashboard() {
       </div>
 
       <div className={`${card} overflow-hidden`}>
+        {rows.some((kelas) => kelas.isExample) && (
+          <div className="border-b border-line px-4 py-3">
+            <Badge tone="warning">Data contoh</Badge>
+          </div>
+        )}
         {rows.length === 0 ? (
           <EmptyState title="Kelas tidak ditemukan" description="Coba ubah kata kunci atau filter." />
         ) : (

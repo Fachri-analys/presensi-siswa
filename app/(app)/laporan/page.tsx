@@ -41,6 +41,7 @@ export default function LaporanPage() {
   const kelas = options.find((c) => c.id === kelasId) ?? options[0];
   const days = workDays(from, to);
   const storedRecap = getStoredAttendanceRecap(attendanceStore, kelas.id, from, to, demoStudents);
+  const isExampleData = storedRecap === null;
   const reportDays = storedRecap?.days ?? days;
   const rows = (storedRecap?.rows ?? getRecap(kelas.id, days)).filter((r) => !status || r[STATUS_KEY[status]] > 0);
   const total = (key: CountKey) => rows.reduce((sum, r) => sum + r[key], 0);
@@ -281,10 +282,10 @@ export default function LaporanPage() {
           </select>
         </Filter>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-          <button type="button" disabled={!ready} onClick={() => window.print()} className={btn.primary}>
+          <button type="button" disabled={!ready || isExampleData} onClick={() => window.print()} className={btn.primary}>
             <Download size={16} aria-hidden /> Download PDF
           </button>
-          <button type="button" disabled={!ready || exporting} onClick={exportExcel} className={btn.outline}>
+          <button type="button" disabled={!ready || isExampleData || exporting} onClick={exportExcel} className={btn.outline}>
             <FileSpreadsheet size={16} aria-hidden /> {exporting ? "Menyiapkan Excel…" : "Download Excel"}
           </button>
           <p className="text-xs text-muted">Untuk PDF, pilih “Simpan sebagai PDF” pada dialog cetak yang terbuka.</p>
@@ -297,6 +298,11 @@ export default function LaporanPage() {
         aria-label="Preview laporan"
         className={`mx-auto w-full overflow-x-auto bg-surface p-6 ring-1 ring-line sm:p-8 print:max-w-none print:overflow-visible print:p-0 print:ring-0 ${landscape ? "max-w-[297mm]" : "max-w-[210mm]"}`}
       >
+        {isExampleData && (
+          <p role="note" className="mb-4 rounded-md border border-warning px-4 py-3 text-sm font-semibold text-warning">
+            Data contoh, bukan data resmi
+          </p>
+        )}
         {!ready ? (
           <EmptyState title="Laporan belum bisa dibuat" description="Pastikan rentang tanggal valid (mencakup hari kerja) dan ada siswa yang sesuai filter." />
         ) : (

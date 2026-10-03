@@ -53,6 +53,11 @@ export default function RiwayatPage() {
           </div>
           {kelas && <p className="rounded-full bg-primary-soft px-3 py-1 text-sm font-semibold text-primary">{kelas.nama}</p>}
         </div>
+        {!storedRows.length && (
+          <p role="note" className="rounded-md border border-warning px-4 py-3 text-sm font-semibold text-warning">
+            Data contoh, bukan data resmi
+          </p>
+        )}
 
         <section aria-label="Ringkasan riwayat" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[

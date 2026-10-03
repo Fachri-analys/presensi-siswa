@@ -6,7 +6,7 @@ import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
-import { getClass, getStudents, OWN_CLASS_ID } from "@/lib/mock";
+import { getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
@@ -94,18 +94,16 @@ export function KetuaKelasDashboard() {
   const [date] = useState(getLocalDateKey);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const savedAttendance = attendanceStore[`${date}::${OWN_CLASS_ID}`] ?? {};
-  const mockAttendance = Object.fromEntries(getStudents(OWN_CLASS_ID).map((student) => [student.nis, { status: student.status, waktu: student.waktu, keterangan: student.keterangan }]));
   const students: Student[] = roster
     .filter((student) => student.kelasId === OWN_CLASS_ID && student.status === "active")
     .map((student) => {
       const saved = savedAttendance[student.nis];
-      const fallback = mockAttendance[student.nis];
       return {
         nis: student.nis,
         nama: student.nama,
-        status: saved ? saved.status : fallback?.status ?? null,
-        waktu: saved ? saved.waktu : fallback?.waktu ?? null,
-        keterangan: saved ? saved.keterangan : fallback?.keterangan ?? "",
+        status: saved?.status ?? null,
+        waktu: saved?.waktu ?? null,
+        keterangan: saved?.keterangan ?? "",
       };
     });
   const [query, setQuery] = useState("");
@@ -130,11 +128,8 @@ export function KetuaKelasDashboard() {
   const close = () => setDialog(null);
 
   function save(nis: string, status: Status, keterangan: string) {
-    const previous = savedAttendance[nis] ?? mockAttendance[nis];
-    const records: Record<string, DemoAttendanceRecord> = {};
-    students.forEach((student) => {
-      records[student.nis] = { status: student.status, waktu: student.waktu, keterangan: student.keterangan };
-    });
+    const previous = savedAttendance[nis];
+    const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
     records[nis] = { status, keterangan, waktu: PRESENT.includes(status) ? (previous?.waktu ?? nowTime()) : null };
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
       setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
@@ -146,11 +141,8 @@ export function KetuaKelasDashboard() {
   }
 
   function remove(nis: string) {
-    const records: Record<string, DemoAttendanceRecord> = {};
-    students.forEach((student) => {
-      records[student.nis] = { status: student.status, waktu: student.waktu, keterangan: student.keterangan };
-    });
-    records[nis] = { status: null, waktu: null, keterangan: "" };
+    const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
+    delete records[nis];
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
       setToast("Presensi belum berhasil dihapus. Coba lagi beberapa saat.");
       return;

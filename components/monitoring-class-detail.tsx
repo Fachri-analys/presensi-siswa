@@ -5,8 +5,8 @@ import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { btn, StatCard } from "@/components/ui";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getStoredClassSummary, subscribeToDemoAttendance } from "@/lib/demo-attendance";
-import { getClass, getStudents, OWN_CLASS_ID } from "@/lib/mock";
+import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, subscribeToDemoAttendance } from "@/lib/demo-attendance";
+import { getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { StudentTable } from "@/components/student-table";
 import { useSyncExternalStore } from "react";
 
@@ -17,19 +17,24 @@ export function MonitoringClassDetail({ classId }: { classId: string }) {
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const activeRoster = roster.filter((student) => student.kelasId === classId && student.status === "active");
   const today = getLocalDateKey();
-  const summary = kelas && getStoredClassSummary(attendanceStore, classId, today, activeRoster.map((student) => student.nis));
-  const mockAttendance = getStudents(classId);
   const students = activeRoster.map((student) => {
       const record = attendanceStore[`${today}::${classId}`]?.[student.nis];
-      const fallback = mockAttendance.find((item) => item.nis === student.nis);
       return {
         nis: student.nis,
         nama: student.nama,
-        status: record ? record.status : fallback?.status ?? null,
-        waktu: record ? record.waktu : fallback?.waktu ?? null,
-        keterangan: record ? record.keterangan : fallback?.keterangan ?? "",
+        status: record?.status ?? null,
+        waktu: record?.waktu ?? null,
+        keterangan: record?.keterangan ?? "",
       };
     });
+  const summary = {
+    siswa: students.length,
+    hadir: students.filter((student) => student.status === "HADIR" || student.status === "TERLAMBAT").length,
+    izin: students.filter((student) => student.status === "IZIN").length,
+    sakit: students.filter((student) => student.status === "SAKIT").length,
+    alpa: students.filter((student) => student.status === "ALPA").length,
+    terlambat: students.filter((student) => student.status === "TERLAMBAT").length,
+  };
   const allowedForRole = role !== "KETUA_KELAS" || classId === OWN_CLASS_ID;
 
   if (!kelas || !allowedForRole) {
@@ -52,7 +57,7 @@ export function MonitoringClassDetail({ classId }: { classId: string }) {
               <Link href="/dashboard" className="hover:underline">Monitoring</Link> / Detail Kelas
             </p>
             <h1 className="text-2xl font-semibold leading-tight">{kelas.nama}</h1>
-            <p className="text-sm text-muted">Jumlah siswa: {summary?.siswa ?? activeRoster.length} · Data presensi hari ini</p>
+            <p className="text-sm text-muted">Jumlah siswa: {summary.siswa} · Data presensi hari ini</p>
           </div>
           <div className="flex gap-2">
             <Link href={`/riwayat?kelas=${kelas.id}`} className={btn.outline}>Riwayat</Link>
@@ -61,11 +66,11 @@ export function MonitoringClassDetail({ classId }: { classId: string }) {
         </div>
 
         <div className="stat-grid [--stat-min:7rem]">
-          <StatCard label="Hadir" value={summary?.hadir ?? kelas.hadir} color="success" />
-          <StatCard label="Izin" value={summary?.izin ?? kelas.izin} color="info" />
-          <StatCard label="Sakit" value={summary?.sakit ?? kelas.sakit} color="warning" />
-          <StatCard label="Alpa" value={summary?.alpa ?? kelas.alpa} color="danger" />
-          <StatCard label="Terlambat" value={summary?.terlambat ?? kelas.terlambat} color="warning" />
+          <StatCard label="Hadir" value={summary.hadir} color="success" />
+          <StatCard label="Izin" value={summary.izin} color="info" />
+          <StatCard label="Sakit" value={summary.sakit} color="warning" />
+          <StatCard label="Alpa" value={summary.alpa} color="danger" />
+          <StatCard label="Terlambat" value={summary.terlambat} color="warning" />
         </div>
 
         <StudentTable students={students} />
