@@ -100,9 +100,9 @@ export function GuruPiketDashboard() {
               <thead>
                 <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
                   {["Kelas", "Siswa", "Hadir", "Izin", "Sakit", "Alpa", "Kehadiran", "Status"].map((h) => (
-                    <th key={h} className={CELL}>{h}</th>
+                    <th key={h} scope="col" className={CELL}>{h}</th>
                   ))}
-                  <th className={CELL}><span className="sr-only">Aksi</span></th>
+                  <th scope="col" className={CELL}><span className="sr-only">Aksi</span></th>
                 </tr>
               </thead>
               <tbody>

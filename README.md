@@ -65,7 +65,9 @@ npm run build
 npm start
 ```
 
-`npm start` menjalankan hasil build produksi. Skrip pengujian otomatis belum disiapkan di `package.json`; pengujian sebelum rilis perlu mencakup pemeriksaan manual seluruh alur, browser, dan backend yang terhubung.
+`npm start` menjalankan hasil build produksi. Jalankan `npm run lint`, `npm run typecheck`, `npm test`, dan `npm run build` sebelum perubahan digabung. Pengujian otomatis meliputi helper statistik/rekap, decoder data, serta guard URL API; pengujian manual seluruh alur, browser, dan backend yang terhubung tetap diperlukan sebelum rilis.
+
+Header keamanan dasar sudah aktif. Content Security Policy (CSP) yang ketat belum diterapkan karena integrasinya perlu mempertimbangkan nonce untuk skrip Next.js.
 
 Pemeriksaan yang terakhir tercatat pada 3 Oktober 2026: `npm run lint`, `npm run build`, dan pemeriksaan TypeScript dengan simbol tak terpakai lulus; audit dependency produksi (`npm audit --omit=dev`) melaporkan 0 kerentanan. Audit semua dependency masih melaporkan 5 kerentanan high pada dependency pengembangan yang berujung pada `braces@3.0.3` melalui toolchain ESLint/Next. Perbaikan otomatis yang ditawarkan menurunkan versi utama `eslint-config-next`, sehingga tidak diterapkan. Audit ulang sebelum rilis dan perbarui toolchain dengan perubahan teruji.
 

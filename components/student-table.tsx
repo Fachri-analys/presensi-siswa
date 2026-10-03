@@ -46,11 +46,11 @@ export function StudentTable({ students, actions }: StudentTableProps) {
         <table className="w-full min-w-176 text-sm">
           <thead>
             <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
-              <th className={CELL}>NIS</th>
-              <th className={CELL}>Nama</th>
-              <th className={CELL}>Status</th>
-              <th className={CELL}>Waktu Presensi</th>
-              <th className={CELL}>{actions ? "Aksi" : "Keterangan"}</th>
+              <th scope="col" className={CELL}>NIS</th>
+              <th scope="col" className={CELL}>Nama</th>
+              <th scope="col" className={CELL}>Status</th>
+              <th scope="col" className={CELL}>Waktu Presensi</th>
+              <th scope="col" className={CELL}>{actions ? "Aksi" : "Keterangan"}</th>
             </tr>
           </thead>
           <tbody>

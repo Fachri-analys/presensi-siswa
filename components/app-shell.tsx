@@ -45,8 +45,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sessionRole = useSyncExternalStore(subscribeToDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot);
   const role = sessionRole ?? "KETUA_KELAS";
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const updateViewport = () => setIsMobile(media.matches);
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
   useEffect(() => {
     if (!sessionRole) router.replace("/login");
   }, [router, sessionRole]);
@@ -78,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {open && <div className="fixed inset-0 z-30 bg-primary/50 lg:hidden" onClick={() => setOpen(false)} />}
 
         <aside
+          inert={isMobile && !open}
           className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col lg:w-56 xl:w-64 bg-primary p-4 transition-transform print:hidden lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
         >
           <div className="mb-6 flex items-center justify-between px-2">

@@ -180,8 +180,8 @@ export function ManageTable<T extends Row>({ noun, initialRows, columns, fields,
             <table className="w-full min-w-176 text-sm">
               <thead>
                 <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
-                  {columns.map((c) => <th key={c.header} className={CELL}>{c.header}</th>)}
-                  {!readOnly && <th className={CELL}>Aksi</th>}
+                  {columns.map((c) => <th key={c.header} scope="col" className={CELL}>{c.header}</th>)}
+                  {!readOnly && <th scope="col" className={CELL}>Aksi</th>}
                 </tr>
               </thead>
               <tbody>
