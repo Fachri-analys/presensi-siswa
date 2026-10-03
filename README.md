@@ -178,7 +178,7 @@ Ketua Kelas demo saat ini memakai kelas tetap `XI TKJ 1` (`OWN_CLASS_ID`) dan na
 - Jika tidak ada catatan tersimpan untuk filter riwayat, pratinjau contoh ditampilkan dan diberi keterangan bahwa itu bukan data tersimpan.
 - Laporan memiliki filter kelas/jurusan (kecuali Ketua Kelas yang dikunci ke kelasnya), tanggal, status, dan orientasi.
 - **PDF:** tombol membuka dialog cetak browser. Untuk file PDF pilih **Simpan sebagai PDF** pada dialog tersebut.
-- **Excel:** workbook `.xlsx` berisi logo, nama sekolah, jurusan, kelas, periode, ringkasan, tabel siswa, autofilter, freeze pane, dan pengaturan cetak.
+- **Excel:** workbook `.xlsx` berisi logo, nama sekolah, jurusan, kelas, periode, ringkasan, tabel siswa, autofilter, baris judul tabel untuk cetak, dan pengaturan cetak.
 - Laporan demo memakai rekap presensi tersimpan jika tersedia. Jika belum ada, angka contoh dari `lib/mock.ts`/fungsi rekap ditampilkan sebagai pratinjau, bukan data resmi.
 
 ### Log aktivitas

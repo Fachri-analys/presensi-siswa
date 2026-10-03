@@ -65,7 +65,6 @@ export default function LaporanPage() {
       workbook.created = new Date();
 
       const sheet = workbook.addWorksheet("Rekap Presensi", {
-        views: [{ state: "frozen", ySplit: 11 }],
         pageSetup: { paperSize: 9, orientation: landscape ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
         properties: { defaultRowHeight: 22 },
       });
@@ -82,7 +81,7 @@ export default function LaporanPage() {
         { key: "persentase", width: 15 },
       ];
       sheet.properties.defaultRowHeight = 22;
-      sheet.views = [{ showGridLines: false, state: "frozen", ySplit: 11 }];
+      sheet.views = [{ showGridLines: false }];
 
       const imageResponse = await fetch("/icon.png");
       if (!imageResponse.ok) throw new Error(`Logo sekolah gagal dimuat (${imageResponse.status}).`);
@@ -224,7 +223,7 @@ export default function LaporanPage() {
       });
       totalRow.getCell(10).numFmt = "0%";
       sheet.autoFilter = { from: { row: headerRowNumber, column: 1 }, to: { row: headerRowNumber, column: 10 } };
-      sheet.pageSetup.printTitlesRow = "1:11";
+      sheet.pageSetup.printTitlesRow = "11:11";
       sheet.pageSetup.printArea = `A1:J${totalRow.number}`;
       sheet.headerFooter.oddFooter = "&C Sistem Presensi Siswa - SMK Negeri 11 Jakarta &R Halaman &P dari &N";
 
