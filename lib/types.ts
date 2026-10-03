@@ -49,3 +49,15 @@ export type StudentRow = { id: string; nis: string; nama: string; kelasId: strin
 export type KelasRow = { id: string; nama: string; jurusan: string; ketua: string };
 export type AccountRow = { id: string; nama: string; email: string; role: Role; kelasId: string };
 export type HistoryRow = { date: string; hadir: number; izin: number; sakit: number; alpa: number; terlambat: number };
+
+export interface AuditEntry {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  objectType: string;
+  objectId: string;
+  result: string;
+  createdAt: string;
+  requestId: string | null;
+}

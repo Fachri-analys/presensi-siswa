@@ -31,6 +31,7 @@ export class ApiError extends Error {
 }
 
 export type Decoder<T> = (value: unknown) => T;
+const REQUEST_TIMEOUT_MS = 15_000;
 export type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;
   headers?: HeadersInit;
@@ -104,15 +105,27 @@ export function createApiClient(baseUrl: string, fetcher: typeof fetch = fetch) 
   }
 
   return async function request<T>(path: string, options: ApiRequestOptions, decode: Decoder<T>): Promise<T> {
-    if (!path || path.startsWith("/") || path.split("/").some((segment) => segment === "..")) {
+    if (!path || path.startsWith("/") || path.split("/").some((segment) => {
+      try {
+        const decodedSegment = decodeURIComponent(segment);
+        return decodedSegment === "." || decodedSegment === "..";
+      } catch {
+        return true;
+      }
+    })) {
       throw new TypeError("Path API harus relatif terhadap URL dasar dan tidak boleh naik direktori.");
     }
 
     const url = new URL(path, base);
+    if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) {
+      throw new TypeError("Path API harus tetap berada di origin dan direktori URL dasar.");
+    }
     for (const [key, value] of Object.entries(options.query ?? {})) {
       if (value !== null && value !== undefined) url.searchParams.set(key, String(value));
     }
 
+    const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
     const headers = new Headers(options.headers);
     if (options.body !== undefined) headers.set("Content-Type", "application/json");
     headers.set("Accept", "application/json");
@@ -128,9 +141,13 @@ export function createApiClient(baseUrl: string, fetcher: typeof fetch = fetch) 
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
         credentials: "include",
         headers,
+        signal,
       });
     } catch (cause) {
-      if (cause instanceof DOMException && cause.name === "AbortError") {
+      if (timeoutSignal.aborted) {
+        throw new ApiError("NETWORK_ERROR", null, null, { cause });
+      }
+      if (options.signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
         throw new ApiError("REQUEST_ABORTED", null, null, { cause });
       }
       throw new ApiError("NETWORK_ERROR", null, null, { cause });
@@ -158,6 +175,16 @@ export function createApiClient(baseUrl: string, fetcher: typeof fetch = fetch) 
     let payload: unknown;
     try {
       payload = await response.json();
+    } catch (cause) {
+      if (timeoutSignal.aborted) {
+        throw new ApiError("NETWORK_ERROR", response.status, requestId, { cause });
+      }
+      if (options.signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+        throw new ApiError("REQUEST_ABORTED", response.status, requestId, { cause });
+      }
+      throw new ApiError("INVALID_RESPONSE", response.status, requestId, { cause });
+    }
+    try {
       return decode(payload);
     } catch (cause) {
       if (cause instanceof ApiError) throw cause;

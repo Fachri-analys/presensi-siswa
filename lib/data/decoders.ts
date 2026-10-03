@@ -34,6 +34,26 @@ function optionalText(value: unknown, path: string): string | null {
   return text(value, path);
 }
 
+function dateText(value: unknown, path: string): string {
+  const date = text(value, path);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
+      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+    throw new ApiDecodeError(path);
+  }
+  return date;
+}
+
+function optionalTimeText(value: unknown, path: string): string | null {
+  if (value === null) return null;
+  const time = text(value, path);
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(time) ||
+      Number(time.slice(0, 2)) > 23 || Number(time.slice(3, 5)) > 59 ||
+      (time.length === 8 && Number(time.slice(6, 8)) > 59)) {
+    throw new ApiDecodeError(path);
+  }
+  return time;
+}
+
 function finiteNumber(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) throw new ApiDecodeError(path);
   return value;
@@ -74,11 +94,11 @@ export function decodeAttendanceRecord(value: unknown): AttendanceRecord {
   const data = object(value, "attendance");
   return {
     id: text(data.id, "attendance.id"),
-    date: text(data.date, "attendance.date"),
+    date: dateText(data.date, "attendance.date"),
     kelasId: text(data.kelasId, "attendance.kelasId"),
     nis: text(data.nis, "attendance.nis"),
     status: enumValue(data.status, STATUSES, "attendance.status"),
-    waktu: optionalText(data.waktu, "attendance.waktu"),
+    waktu: optionalTimeText(data.waktu, "attendance.waktu"),
     keterangan: text(data.keterangan, "attendance.keterangan"),
     createdBy: text(data.createdBy, "attendance.createdBy"),
     updatedBy: text(data.updatedBy, "attendance.updatedBy"),
@@ -158,7 +178,7 @@ export function decodeClassSummary(value: unknown): ClassSummary & { id: string;
 export function decodeHistoryRow(value: unknown): HistoryRow {
   const data = object(value, "history");
   return {
-    date: text(data.date, "history.date"),
+    date: dateText(data.date, "history.date"),
     hadir: nonNegativeInteger(data.hadir, "history.hadir"),
     izin: nonNegativeInteger(data.izin, "history.izin"),
     sakit: nonNegativeInteger(data.sakit, "history.sakit"),
@@ -185,8 +205,8 @@ export function decodeAttendanceReport(value: unknown): AttendanceReport {
   if (!Array.isArray(data.rows)) throw new ApiDecodeError("report.rows");
   return {
     kelas: decodeClass(data.kelas),
-    from: text(data.from, "report.from"),
-    to: text(data.to, "report.to"),
+    from: dateText(data.from, "report.from"),
+    to: dateText(data.to, "report.to"),
     effectiveDays: nonNegativeInteger(data.effectiveDays, "report.effectiveDays"),
     rows: data.rows.map(decodeRecapRow),
   };

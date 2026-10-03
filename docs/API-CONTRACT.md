@@ -11,6 +11,7 @@ Dokumen ini membantu memulai diskusi integrasi. Ini **bukan** spesifikasi server
 - Base URL dikonfigurasi melalui `NEXT_PUBLIC_API_BASE_URL`, misalnya `https://api.example.sch.id/api/v1/`. Jangan masukkan secret di URL/environment publik.
 - Gunakan HTTPS selain localhost.
 - ID entity adalah string stabil yang diterbitkan server.
+- Segmen path dinamis untuk ID wajib dikodekan dengan `encodeURIComponent` sebelum digabungkan ke URL.
 - Usulan waktu: tanggal presensi sebagai `YYYY-MM-DD`; timestamp audit sebagai ISO 8601 dengan zona/offset eksplisit. Zona waktu sekolah perlu disahkan.
 - Usulan request/response JSON UTF-8.
 - Fondasi frontend saat ini menerima objek JSON langsung dan decoder per endpoint. Bila tim memilih envelope seperti `{ "data": ... }`, adapter/decoder harus secara eksplisit membuka envelope; jangan membuat asumsi diam-diam.
@@ -218,7 +219,7 @@ Sepakati batas maksimum `limit`, urutan stabil, perilaku pencarian, dan apakah `
 
 ## 6. Keputusan kontrak yang harus disepakati sebelum coding adapter
 
-1. Bare JSON object atau envelope `{data: ...}`.
+1. Bare JSON object atau envelope `{ success, message, data, error }`; jika envelope dipilih, adapter harus membukanya secara eksplisit sebelum decoder domain berjalan.
 2. Metode/route final, nama field, format tanggal/waktu, status enum, dan representasi nullable.
 3. `studentId` atau NIS pada foreign key presensi.
 4. Semantik PUT batch, idempotency key, duplikasi, dan update bersamaan (misalnya ETag/version).
@@ -227,3 +228,4 @@ Sepakati batas maksimum `limit`, urutan stabil, perilaku pencarian, dan apakah `
 7. Bentuk error final, `requestId`, field validation, dan pemetaan ke pesan pengguna.
 8. Kebijakan penghapusan, audit log, reset password, hari efektif, kalender libur, zona waktu.
 9. Apakah laporan/ekspor diproses di frontend atau server.
+10. Apakah status presensi perlu diperluas dengan `DISPENSASI`; status itu belum didukung frontend dan tidak boleh ditambahkan tanpa keputusan produk.

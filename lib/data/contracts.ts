@@ -1,5 +1,4 @@
-import type { ClassSummary, HistoryRow, RecapRow, Role, Status, StudentRow } from "../types";
-import type { ActivityLogEntry } from "../activity-log";
+import type { AuditEntry, ClassSummary, HistoryRow, RecapRow, Role, Status, StudentRow } from "../types";
 
 export interface SessionUser {
   id: string;
@@ -165,5 +164,5 @@ export interface MonitoringRepository {
 }
 
 export interface ActivityRepository {
-  listActivity(query?: PaginationQuery, signal?: AbortSignal): Promise<Page<ActivityLogEntry>>;
+  listActivity(query?: PaginationQuery, signal?: AbortSignal): Promise<Page<AuditEntry>>;
 }
