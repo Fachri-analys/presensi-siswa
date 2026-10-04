@@ -7,11 +7,14 @@ import { btn, field } from "@/components/ui";
 import { ROLE_LABEL, type Role } from "@/lib/types";
 import { getDemoSessionRole, setDemoSessionRole } from "@/lib/demo-session";
 
-const LOGIN_ROLES: Role[] = ["KETUA_KELAS", "GURU_PIKET", "ADMIN"];
+const DEMO_ACCOUNTS: { identifier: string; password: string; role: Role }[] = [
+  { identifier: "aisyah.putri@smkn11jakarta.sch.id", password: "demo-ketua-2026", role: "KETUA_KELAS" },
+  { identifier: "piket.senin@smkn11jakarta.sch.id", password: "demo-guru-2026", role: "GURU_PIKET" },
+  { identifier: "admin@smkn11jakarta.sch.id", password: "demo-admin-2026", role: "ADMIN" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
-  const [role, setRole] = useState<Role>("KETUA_KELAS");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,8 +31,15 @@ export default function LoginPage() {
       setError("Isi username/email dan password untuk melanjutkan.");
       return;
     }
+    const account = DEMO_ACCOUNTS.find(
+      (demoAccount) => demoAccount.identifier === identifier.toLowerCase() && demoAccount.password === password,
+    );
+    if (!account) {
+      setError("Email atau password akun demo tidak sesuai.");
+      return;
+    }
     try {
-      setDemoSessionRole(role);
+      setDemoSessionRole(account.role);
     } catch (error) {
       console.error("Sesi demo tidak dapat disimpan.", error);
       setError("Sesi masuk tidak dapat disimpan di browser ini. Periksa pengaturan penyimpanan browser lalu coba lagi.");
@@ -39,7 +49,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-[minmax(22rem,5fr)_7fr]">
+    <main className="page-enter grid min-h-screen lg:grid-cols-[minmax(22rem,5fr)_7fr]">
       <section className="hidden flex-col justify-between bg-primary p-10 lg:flex xl:p-16">
         <div className="space-y-6">
           <Logo size={88} />
@@ -67,23 +77,6 @@ export default function LoginPage() {
           </div>
 
           <label className="grid gap-2 text-sm font-medium">
-            Masuk sebagai
-            <select
-              name="role"
-              value={role}
-              onChange={(e) => {
-                const selectedRole = LOGIN_ROLES.find((option) => option === e.target.value);
-                if (selectedRole) setRole(selectedRole);
-              }}
-              className={`${field} h-12 font-normal`}
-            >
-              {LOGIN_ROLES.map((option) => (
-                <option key={option} value={option}>{ROLE_LABEL[option]}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium">
             Username / Email
             <input name="identifier" autoComplete="username" required placeholder="nama@smkn11jakarta.sch.id" className={`${field} h-12 font-normal`} />
           </label>
@@ -107,7 +100,19 @@ export default function LoginPage() {
 
           {error && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
           <button type="submit" className={`${btn.primary} h-12 w-full`}>Login</button>
-          <p className="text-xs leading-relaxed text-muted">Mode simulasi frontend: data akun dan password tidak diverifikasi. Pilih peran untuk melihat contoh tampilan; sistem produksi harus memverifikasi hak akses melalui server.</p>
+          <details className="rounded-md border border-line px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium text-primary">Akun demo untuk setiap peran</summary>
+            <dl className="mt-3 space-y-3 text-xs">
+              {DEMO_ACCOUNTS.map((account) => (
+                <div key={account.role}>
+                  <dt className="font-semibold text-ink">{ROLE_LABEL[account.role]}</dt>
+                  <dd className="mt-1 break-all text-muted">Email: {account.identifier}</dd>
+                  <dd className="text-muted">Password: {account.password}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+          <p className="text-xs leading-relaxed text-muted">Login ini hanya simulasi frontend dengan akun demo publik. Di sistem produksi, backend memverifikasi password, menentukan role dari akun, dan menolak akses yang tidak diizinkan.</p>
         </form>
       </section>
     </main>

@@ -57,6 +57,18 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
+### Akun demo lokal
+
+Pada halaman masuk, role ditentukan dari kredensial akun; tidak ada pemilih role. Gunakan salah satu akun berikut untuk mencoba tampilan setiap peran:
+
+| Peran | Email | Password |
+|---|---|---|
+| Ketua Kelas | `aisyah.putri@smkn11jakarta.sch.id` | `demo-ketua-2026` |
+| Guru Piket | `piket.senin@smkn11jakarta.sch.id` | `demo-guru-2026` |
+| Admin | `admin@smkn11jakarta.sch.id` | `demo-admin-2026` |
+
+Kredensial ini tertanam di frontend dan hanya untuk simulasi lokal—bukan rahasia maupun autentikasi produksi. Backend produksi harus memverifikasi password, menentukan role dari akun tersimpan di server, dan menolak akses yang tidak sesuai; jangan gunakan password demo tersebut untuk akun sekolah.
+
 Contoh konfigurasi alamat backend ada di `.env.example`. Untuk uji lokal, salin menjadi `.env.local` lalu ubah URL sesuai server API. File `.env.local` tidak boleh dimasukkan ke Git. Konfigurasi ini baru menyiapkan alamat; UI demo **belum** mengirim permintaan ke backend.
 
 ```bash
@@ -100,7 +112,7 @@ Aplikasi membantu sekolah mencatat kehadiran per siswa dan per kelas, memantau k
 | URL | Nama di aplikasi | Isi dan batas utama |
 |---|---|---|
 | `/` | Arahkan ke Masuk | Mengalihkan pengguna ke `/login`. |
-| `/login` | Masuk | Form masuk dan pilihan peran simulasi. Bukan autentikasi sebenarnya. |
+| `/login` | Masuk | Form masuk tanpa pemilih role; akun demo menentukan tampilan peran. Bukan autentikasi produksi. |
 | `/dashboard` | Dashboard | Ringkasan dan jalan pintas menyesuaikan peran. |
 | `/presensi` | Presensi | Ketua Kelas diarahkan ke presensi kelasnya; Guru Piket dan Admin memilih kelas untuk mengisi presensi. |
 | `/siswa` | Siswa | Ketua Kelas hanya daftar kelas tugas; Guru Piket daftar siswa aktif semua kelas; Admin mengelola siswa. |

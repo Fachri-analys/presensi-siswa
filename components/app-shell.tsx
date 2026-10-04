@@ -91,11 +91,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <RoleContext value={{ role }}>
       <div className="min-h-screen lg:pl-56 xl:pl-64 print:pl-0">
-        {open && <div className="fixed inset-0 z-30 bg-primary/50 lg:hidden" onClick={() => setOpen(false)} />}
+        {open && <div className="fixed inset-0 z-30 bg-primary/50 motion-safe:animate-[backdrop-enter_240ms_ease-out_both] lg:hidden" onClick={() => setOpen(false)} />}
 
         <aside
           inert={isMobile && !open}
-          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col lg:w-56 xl:w-64 bg-primary p-4 transition-transform print:hidden lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-primary p-4 transition-transform duration-300 ease-out print:hidden lg:w-56 lg:translate-x-0 xl:w-64 ${open ? "translate-x-0" : "-translate-x-full"}`}
         >
           <div className="mb-6 flex items-center justify-between px-2">
             <div className="flex items-center gap-4">
@@ -168,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl p-4 md:p-6 xl:p-8 print:max-w-none print:p-0">{children}</main>
+        <main key={pathname} className="page-enter mx-auto max-w-7xl p-4 md:p-6 xl:p-8 print:max-w-none print:p-0">{children}</main>
       </div>
     </RoleContext>
   );
