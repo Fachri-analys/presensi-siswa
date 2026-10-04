@@ -149,7 +149,7 @@ Admin memiliki akses ke semua halaman, tetapi aktivitas pencatatan presensi teta
 
 ### Kondisi implementasi saat ini
 
-Tabel di atas adalah **aturan produk yang dituju**, bukan jaminan keamanan yang sudah diterapkan. Role saat ini disimulasikan oleh pilihan pada halaman masuk dan disimpan di `sessionStorage`. Pemeriksaan akses `RoleGate`, menu navigasi, dan filter kelas hanya membatasi tampilan browser. Backend wajib menolak permintaan yang tidak berizin, termasuk jika seseorang memanggil API langsung atau mengubah data di browser.
+Tabel di atas adalah **aturan produk yang dituju**, bukan jaminan keamanan yang sudah diterapkan. Role demo ditentukan dari pencocokan email dan password akun contoh, lalu disimpan di `sessionStorage`. Kredensial demo tertanam di frontend dan dapat dilihat pengguna; jangan diperlakukan sebagai autentikasi aman. Pemeriksaan akses `RoleGate`, menu navigasi, dan filter kelas hanya membatasi tampilan browser. Backend wajib memverifikasi akun dan menolak permintaan yang tidak berizin, termasuk jika seseorang memanggil API langsung atau mengubah data di browser.
 
 Ketua Kelas demo saat ini memakai kelas tetap `XI PPLG 1` (`OWN_CLASS_ID`) dan identitas akun contoh. Setelah backend tersedia, kelas, nama, dan hak akses harus berasal dari profil/sesi akun, bukan konstanta frontend.
 
@@ -158,8 +158,8 @@ Ketua Kelas demo saat ini memakai kelas tetap `XI PPLG 1` (`OWN_CLASS_ID`) dan i
 ### Masuk dan keluar
 
 1. Pengguna membuka halaman Masuk.
-2. Pada demo, pengguna memilih peran lalu mengisi username/email dan password yang tidak kosong.
-3. Demo menerima nilai apa pun yang tidak kosong; tidak ada pencocokan akun atau password.
+2. Pada demo, pengguna mengisi email dan password dari salah satu akun yang didokumentasikan pada bagian [Akun demo lokal](#akun-demo-lokal); role ditentukan dari akun yang cocok.
+3. Email atau password yang tidak cocok ditolak. Pemeriksaan ini hanya simulasi frontend dan bukan autentikasi produksi.
 4. Tombol **Keluar** tersedia pada header dan menu samping; sesi demo dihapus dan pengguna kembali ke Masuk.
 5. Produksi harus memverifikasi akun di server, mengembalikan sesi aman, dan menentukan role serta kelas akun dari server. Pengguna tidak boleh memilih role saat login produksi.
 
