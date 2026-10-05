@@ -45,16 +45,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sessionRole = useSyncExternalStore(subscribeToDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot);
   const role = sessionRole ?? "KETUA_KELAS";
   const [open, setOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1023px)");
-    const updateViewport = () => setIsMobile(media.matches);
-    updateViewport();
-    media.addEventListener("change", updateViewport);
-    return () => media.removeEventListener("change", updateViewport);
-  }, []);
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -90,12 +82,21 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <RoleContext value={{ role }}>
-      <div className="min-h-screen lg:pl-56 xl:pl-64 print:pl-0">
-        {open && <div className="fixed inset-0 z-30 bg-primary/50 motion-safe:animate-[backdrop-enter_240ms_ease-out_both] lg:hidden" onClick={() => setOpen(false)} />}
+      <div className="min-h-screen print:pl-0">
+        {open && (
+          <button
+            type="button"
+            aria-label="Tutup menu"
+            className="fixed inset-0 z-30 bg-primary/50 motion-safe:animate-[backdrop-enter_240ms_ease-out_both] print:hidden"
+            onClick={() => setOpen(false)}
+          />
+        )}
 
         <aside
-          inert={isMobile && !open}
-          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-primary p-4 transition-transform duration-300 ease-out print:hidden lg:w-56 lg:translate-x-0 xl:w-64 ${open ? "translate-x-0" : "-translate-x-full"}`}
+          id="main-navigation"
+          aria-label="Navigasi utama"
+          inert={!open}
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-primary p-4 transition-transform duration-300 ease-out print:hidden ${open ? "translate-x-0" : "-translate-x-full"}`}
         >
           <div className="mb-6 flex items-center justify-between px-2">
             <div className="flex items-center gap-4">
@@ -105,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <p className="text-xs text-sky">Sistem Presensi</p>
               </div>
             </div>
-            <button type="button" aria-label="Tutup menu" className="text-white lg:hidden" onClick={() => setOpen(false)}>
+            <button type="button" aria-label="Tutup menu" className="text-white" onClick={() => setOpen(false)}>
               <X size={20} />
             </button>
           </div>
@@ -143,8 +144,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 bg-primary px-4 text-white print:hidden md:px-6 lg:h-18 lg:border-b lg:border-line lg:bg-surface xl:px-8 lg:text-ink">
-          <button type="button" aria-label="Buka menu" className="lg:hidden" onClick={() => setOpen(true)}>
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 bg-primary px-4 text-white print:hidden md:px-6 lg:h-18 lg:border-b lg:border-line lg:bg-surface lg:text-ink xl:px-8">
+          <button
+            type="button"
+            aria-label="Buka menu"
+            aria-controls="main-navigation"
+            aria-expanded={open}
+            className="shrink-0 rounded-md p-2 text-white hover:bg-white/10 lg:text-ink lg:hover:bg-primary-soft"
+            onClick={() => setOpen(true)}
+          >
             <Menu size={24} />
           </button>
           <div className="text-center lg:text-left">
