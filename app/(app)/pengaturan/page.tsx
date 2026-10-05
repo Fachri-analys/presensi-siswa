@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { KeyRound } from "lucide-react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
+import { Clock3, KeyRound, LockKeyhole, LockOpen } from "lucide-react";
 import { useRole } from "@/components/app-shell";
 import { ManageTable, type Column, type FieldDef } from "@/components/manage-table";
-import { Badge, btn, card } from "@/components/ui";
+import { Badge, btn, card, field } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { addDemoActivity } from "@/lib/activity-log";
 import { getAccountRows, getClasses } from "@/lib/mock";
 import { ROLE_LABEL, type AccountRow, type Role } from "@/lib/types";
+import {
+  getDemoAttendanceSchedule,
+  getDemoAttendanceScheduleServerSnapshot,
+  isValidAttendanceSchedule,
+  saveDemoAttendanceSchedule,
+  subscribeToDemoAttendanceSchedule,
+  type AttendanceSessionId,
+  type AttendanceSessionSchedule,
+  type DemoAttendanceSchedule,
+} from "@/lib/demo-schedule";
 
 const classes = getClasses();
 const roles = Object.keys(ROLE_LABEL) as Role[];
@@ -39,6 +49,12 @@ function validate(values: Record<string, string>, rows: AccountRow[], editingId?
 export default function PengaturanPage() {
   const { role } = useRole();
   const [reset, setReset] = useState<{ account: AccountRow; temporaryPassword: string } | null>(null);
+  const schedule = useSyncExternalStore(
+    subscribeToDemoAttendanceSchedule,
+    getDemoAttendanceSchedule,
+    getDemoAttendanceScheduleServerSnapshot,
+  );
+
   if (role !== "ADMIN") {
     return (
       <section className={`${card} max-w-lg space-y-4 p-6`}>
@@ -52,9 +68,11 @@ export default function PengaturanPage() {
     );
   }
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <AttendanceScheduleForm key={JSON.stringify(schedule)} schedule={schedule} />
+
       <div>
-        <h1 className="text-lg font-semibold">Akun pengguna</h1>
+        <h2 className="text-lg font-semibold">Akun pengguna</h2>
         <p className="text-sm text-muted">Kelola akun Admin, Guru Piket, dan Ketua Kelas.</p>
       </div>
       <ManageTable<AccountRow>
@@ -93,5 +111,102 @@ export default function PengaturanPage() {
         )}
       </Dialog>
     </div>
+  );
+}
+
+function AttendanceScheduleForm({ schedule }: { schedule: DemoAttendanceSchedule }) {
+  const [draft, setDraft] = useState(schedule);
+  const [message, setMessage] = useState<string | null>(null);
+
+  function updateTime(session: AttendanceSessionId, field: "mulai" | "selesai", value: string) {
+    setDraft((current) => ({
+      ...current,
+      [session]: { ...current[session], [field]: value },
+    }));
+    setMessage(null);
+  }
+
+  function saveSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isValidAttendanceSchedule(draft)) {
+      setMessage("Pastikan jam selesai setelah jam mulai dan sesi pagi tidak bertabrakan dengan sesi siang.");
+      return;
+    }
+    if (!saveDemoAttendanceSchedule(draft)) {
+      setMessage("Jadwal belum berhasil disimpan. Periksa penyimpanan browser lalu coba lagi.");
+      return;
+    }
+    addDemoActivity("Jadwal presensi diperbarui", "Admin memperbarui jam presensi sesi pagi dan siang.");
+    setMessage("Jadwal presensi berhasil disimpan.");
+  }
+
+  function toggleSessionLock(session: AttendanceSessionId) {
+    const current = getDemoAttendanceSchedule();
+    const next = {
+      ...current,
+      [session]: { ...current[session], terkunci: !current[session].terkunci },
+    };
+    if (!saveDemoAttendanceSchedule(next)) {
+      setMessage("Status kunci sesi belum berhasil diubah. Periksa penyimpanan browser lalu coba lagi.");
+      return;
+    }
+    const status = next[session].terkunci ? "dikunci" : "dibuka";
+    addDemoActivity("Kunci sesi presensi diubah", `Admin ${status} sesi ${session}.`);
+    setMessage(`Sesi ${session} berhasil ${status}.`);
+  }
+
+  return (
+    <section className={`${card} space-y-4 p-5`}>
+      <div>
+        <h1 className="flex items-center gap-2 text-lg font-semibold"><Clock3 size={20} aria-hidden /> Jadwal presensi</h1>
+        <p className="mt-1 text-sm text-muted">Atur jendela presensi untuk Ketua Kelas. Di luar jam atau saat sesi dikunci, status Hadir/Terlambat memerlukan izin Guru Piket per siswa.</p>
+      </div>
+      <form onSubmit={saveSchedule} className="space-y-4">
+        {(["pagi", "siang"] as const).map((session) => (
+          <SessionScheduleFields
+            key={session}
+            id={session}
+            schedule={draft[session]}
+            onTimeChange={(field, value) => updateTime(session, field, value)}
+            onToggleLock={() => toggleSessionLock(session)}
+          />
+        ))}
+        {message && <p role="status" className="rounded-md bg-primary-soft px-3 py-2 text-sm text-primary">{message}</p>}
+        <button type="submit" className={btn.primary}>Simpan jadwal</button>
+      </form>
+    </section>
+  );
+}
+
+function SessionScheduleFields({
+  id,
+  schedule,
+  onTimeChange,
+  onToggleLock,
+}: {
+  id: AttendanceSessionId;
+  schedule: AttendanceSessionSchedule;
+  onTimeChange: (field: "mulai" | "selesai", value: string) => void;
+  onToggleLock: () => void;
+}) {
+  const title = id === "pagi" ? "Sesi pagi" : "Sesi siang";
+  const LockIcon = schedule.terkunci ? LockKeyhole : LockOpen;
+  return (
+    <fieldset className={`${card} grid gap-4 p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end`}>
+      <legend className="px-1 text-sm font-semibold">{title}</legend>
+      <label className="grid gap-2 text-sm font-medium">
+        Jam masuk
+        <input type="time" value={schedule.mulai} onChange={(event) => onTimeChange("mulai", event.target.value)} required className={field} />
+      </label>
+      <label className="grid gap-2 text-sm font-medium">
+        Jam keluar
+        <input type="time" value={schedule.selesai} onChange={(event) => onTimeChange("selesai", event.target.value)} required className={field} />
+      </label>
+      <p className="text-sm text-muted">{schedule.terkunci ? "Sesi dikunci" : "Sesi tidak dikunci"}</p>
+      <button type="button" onClick={onToggleLock} className={btn.outline}>
+        <LockIcon size={16} aria-hidden />
+        {schedule.terkunci ? "Buka kunci" : "Kunci sesi"}
+      </button>
+    </fieldset>
   );
 }

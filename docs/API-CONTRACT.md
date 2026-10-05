@@ -229,3 +229,4 @@ Sepakati batas maksimum `limit`, urutan stabil, perilaku pencarian, dan apakah `
 8. Kebijakan penghapusan, audit log, reset password, hari efektif, kalender libur, zona waktu.
 9. Apakah laporan/ekspor diproses di frontend atau server.
 10. Apakah status presensi perlu diperluas dengan `DISPENSASI`; status itu belum didukung frontend dan tidak boleh ditambahkan tanpa keputusan produk.
+11. Bentuk resource jadwal sesi pagi/siang yang dapat dibaca semua role terkait dan diubah Admin, aturan zona `Asia/Jakarta`, serta cara Guru Piket memberi izin `HADIR`/`TERLAMBAT` satu kali per siswa/tanggal. Backend wajib memvalidasi jam/lock dan izin pada setiap simpan, mengonsumsi izin secara atomik, dan mencatat perubahan jadwal/izin di audit log.

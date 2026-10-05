@@ -55,6 +55,7 @@ Perlu memantau seluruh data, melakukan semua operasi presensi sesuai kebijakan, 
 - Login, pemeliharaan sesi, dan logout berbasis server.
 - Dashboard menyesuaikan identitas, role, dan cakupan akses.
 - Presensi harian per kelas: Hadir, Terlambat, Izin, Sakit, Alpa, atau belum diisi.
+- Jadwal dua sesi presensi yang dikelola Admin; pencatatan Hadir/Terlambat oleh Ketua Kelas dibatasi jam sesi, dengan izin satu kali per siswa dari Guru Piket saat sesi tutup/dikunci.
 - Pencarian siswa dalam daftar, pemilihan kelas/tanggal sesuai role, serta koreksi/penghapusan catatan presensi.
 - Daftar siswa; pengelolaan (buat, ubah, nonaktifkan, dan sesuai kebijakan hapus) hanya Admin.
 - Pengelolaan guru, kelas, penugasan Ketua Kelas, dan akun hanya Admin.
@@ -78,6 +79,8 @@ Perlu memantau seluruh data, melakukan semua operasi presensi sesuai kebijakan, 
 10. Kesalahan teknis mentah, stack trace, query, credential, dan data rahasia tidak ditampilkan di UI.
 11. Jumlah “Hadir” mencakup “Terlambat”; nilai Terlambat ditampilkan sebagai rincian dan tidak dijumlahkan lagi sebagai kategori terpisah.
 12. Log audit untuk perubahan penting ditulis server-side dan tidak dapat diubah oleh pengguna aplikasi.
+13. Admin mengatur sesi pagi dan siang dalam zona `Asia/Jakarta`; sesi memiliki jam mulai/selesai dan dapat dikunci terpisah. Rentang sesi tidak bertumpang tindih.
+14. Ketua Kelas hanya dapat mencatat Hadir/Terlambat dalam sesi yang sedang terbuka; di luar sesi atau saat dikunci, hanya Izin/Sakit/Alpa tersedia kecuali Guru Piket memberi izin satu kali untuk siswa/tanggal terkait.
 
 ## 8. Alur pengguna utama
 

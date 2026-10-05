@@ -170,6 +170,9 @@ Ketua Kelas demo saat ini memakai kelas tetap `XI PPLG 1` (`OWN_CLASS_ID`) dan i
 3. Menghapus presensi mengembalikan catatan menjadi belum presensi; tidak menghapus data siswa.
 4. Keterangan bersifat opsional. Waktu presensi dicatat untuk status Hadir/Terlambat.
 5. Hasil perubahan disimpan sebagai presensi untuk tanggal berjalan di sesi tab pada demo.
+6. Jadwal awal demo adalah sesi pagi 07.00–12.00 dan siang 13.00–17.00 WIB; Admin dapat mengubah jam dan mengunci setiap sesi melalui Pengaturan.
+7. Hadir/Terlambat hanya dapat dicatat Ketua Kelas di dalam sesi yang sedang terbuka dan tidak dikunci. Di luar jadwal atau ketika dikunci, Ketua Kelas hanya dapat memilih Izin, Sakit, atau Alpa.
+8. Guru Piket dapat memberi izin Hadir/Terlambat di luar jadwal kepada siswa tertentu dari halaman presensi, lalu menyimpan izinnya. Izin berlaku sekali untuk siswa dan tanggal tersebut; setelah dipakai, izin habis. Guru Piket juga dapat langsung mencatat semua status.
 
 ### Presensi Guru Piket/Admin
 
@@ -207,7 +210,7 @@ Log demo menggunakan kalimat sederhana, waktu aktivitas, tindakan, dan keteranga
 
 ### Penyimpanan frontend
 
-Data awal dan nilai contoh berasal dari `lib/mock.ts`. Data yang berubah disimpan di `sessionStorage`, bukan database. Perubahan tidak disinkronkan antar tab, browser, perangkat, atau pengguna dan umumnya hilang ketika sesi tab berakhir.
+Data awal dan nilai contoh berasal dari `lib/mock.ts`. Data presensi, role, dan daftar yang dikelola disimpan di `sessionStorage`, bukan database. Jadwal demo disimpan di `localStorage` agar perubahan Admin terlihat di tab browser lain pada perangkat yang sama. Data tersebut tetap bisa diubah pengguna dan bukan sumber kebenaran produksi.
 
 Kunci penyimpanan demo yang digunakan:
 
@@ -220,6 +223,7 @@ Kunci penyimpanan demo yang digunakan:
 | `presensi-demo-activity-log` | Log demo terbaru. |
 | `presensi-demo-akun` | Perubahan akun demo di halaman Pengaturan. |
 | `presensi-demo-kelas` | Perubahan kelas demo di halaman Kelas. |
+| `presensi-demo-schedule` (localStorage) | Jam mulai/selesai dan status kunci sesi pagi/siang. |
 
 **Jangan menganggap isi browser sebagai data sekolah.** Pengguna dapat mengubah `sessionStorage`; jangan menggunakannya untuk otorisasi, data personal produksi, audit resmi, atau cadangan.
 
@@ -227,7 +231,8 @@ Kunci penyimpanan demo yang digunakan:
 
 - Tidak ada autentikasi akun nyata, pemulihan akun, atau verifikasi password.
 - Tidak ada backend, database, API, sesi server, dan sinkronisasi lintas perangkat.
-- Role yang dipilih browser tidak membuktikan identitas pengguna.
+- Role demo yang disimpan browser tidak membuktikan identitas pengguna.
+- Jadwal dan izin Hadir luar jadwal demo tersimpan di browser; backend produksi harus menjadi sumber jadwal dan memvalidasi izin Guru Piket di server pada setiap penyimpanan presensi.
 - Penugasan Ketua Kelas masih menggunakan konstanta demo.
 - Data akun di halaman Admin berasal dari daftar contoh; semua perubahan UI bukan perubahan akun sungguhan.
 - Reset password hanya menghasilkan string sementara di browser; belum mengubah kredensial atau mengirim notifikasi aman.

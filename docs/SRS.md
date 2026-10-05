@@ -53,6 +53,9 @@ Matriks otorisasi:
 - **FR-ATT-08:** Penghapusan catatan presensi tidak boleh menghapus data siswa.
 - **FR-ATT-09:** Simpan batch harus atomik: semua perubahan diterima, atau kegagalan harus dinyatakan dengan detail validasi yang aman dan tidak menghasilkan keadaan parsial yang tidak jelas.
 - **FR-ATT-10:** Sistem harus mencatat audit untuk pembuatan, koreksi, dan penghapusan presensi.
+- **FR-ATT-11:** Admin dapat mengatur jam mulai/selesai untuk sesi pagi dan siang, serta mengunci/membuka tiap sesi. Waktu menggunakan zona `Asia/Jakarta`; rentang sesi tidak boleh terbalik atau tumpang tindih.
+- **FR-ATT-12:** Ketua Kelas dapat mencatat `HADIR` atau `TERLAMBAT` hanya dalam sesi yang waktunya aktif dan tidak terkunci. Di luar kondisi itu, Ketua Kelas hanya dapat mencatat `IZIN`, `SAKIT`, atau `ALPA`.
+- **FR-ATT-13:** Guru Piket dapat memberi izin satu kali untuk `HADIR`/`TERLAMBAT` kepada siswa dan tanggal tertentu saat sesi tutup/dikunci. Izin dicatat dan diaudit server-side, lalu dikonsumsi setelah dipakai. Guru Piket dapat mencatat presensi secara langsung.
 
 ### Data sekolah dan akun
 
@@ -122,6 +125,8 @@ Matriks otorisasi:
 8. Monitoring, riwayat, PDF/cetak, dan Excel memakai dataset, tanggal, kelas, role, dan definisi hitung yang sama.
 9. Audit log memuat perubahan penting dan tidak dapat diubah melalui endpoint aplikasi.
 10. Respons kesalahan tidak memperlihatkan stack trace, SQL, credential, atau detail internal.
+11. Admin dapat mengatur dan mengunci dua sesi; server menolak waktu sesi yang tidak valid atau bertumpang tindih.
+12. Presensi Ketua Kelas untuk `HADIR`/`TERLAMBAT` di luar sesi terbuka ditolak kecuali tersedia izin Guru Piket yang sah untuk siswa/tanggal tersebut; izin yang sama tidak dapat dipakai kembali.
 
 ## 7. Dependensi yang belum ditentukan
 

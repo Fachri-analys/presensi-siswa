@@ -7,6 +7,7 @@ export type DemoAttendanceRecord = {
   status: Status | null;
   waktu: string | null;
   keterangan: string;
+  izinHadir?: boolean;
 };
 
 type AttendanceStore = Record<string, Record<string, DemoAttendanceRecord>>;
@@ -109,7 +110,8 @@ function isRecord(value: unknown): value is DemoAttendanceRecord {
   const item = value as Record<string, unknown>;
   return (item.status === null || VALID_STATUSES.includes(item.status as Status)) &&
     (typeof item.waktu === "string" || item.waktu === null) &&
-    typeof item.keterangan === "string";
+    typeof item.keterangan === "string" &&
+    (item.izinHadir === undefined || typeof item.izinHadir === "boolean");
 }
 
 function isAttendanceStore(value: unknown): value is AttendanceStore {

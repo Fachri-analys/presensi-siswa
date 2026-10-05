@@ -8,9 +8,11 @@ import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, ge
 import { addDemoActivity } from "@/lib/activity-log";
 import { getAccountRows, getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
+import { canMarkPresent } from "@/lib/demo-schedule";
 import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
 import { btn, field, StatCard, StatusBadge } from "./ui";
+import { useAttendanceWindow } from "./use-attendance-window";
 
 // Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
 // dan pembatasan aksesnya tetap dipaksakan di backend.
@@ -38,12 +40,15 @@ function IconButton({ label, onClick, danger, disabled, children }: { label: str
 interface FormProps {
   options: Student[];
   target?: Student;
+  presentAllowedFor: (nis: string) => boolean;
   onSubmit: (nis: string, status: Status, keterangan: string) => void;
   onCancel: () => void;
 }
 
-function PresensiForm({ options, target, onSubmit, onCancel }: FormProps) {
+function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }: FormProps) {
   const [formError, setFormError] = useState<string | null>(null);
+  const [selectedNis, setSelectedNis] = useState(target?.nis ?? "");
+  const presentAllowed = presentAllowedFor(selectedNis);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -55,13 +60,17 @@ function PresensiForm({ options, target, onSubmit, onCancel }: FormProps) {
       setFormError("Pilih siswa dan status presensi yang tersedia.");
       return;
     }
+    if (PRESENT.includes(value) && !presentAllowed) {
+      setFormError("Status Hadir/Terlambat di luar jadwal memerlukan izin Guru Piket.");
+      return;
+    }
     onSubmit(nis, value, String(data.get("keterangan") ?? "").trim());
   }
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
       <label className="grid gap-2 text-sm font-medium">
         Siswa
-        <select name="nis" defaultValue={target?.nis ?? ""} className={field}>
+        <select name="nis" defaultValue={target?.nis ?? ""} onChange={(event) => setSelectedNis(event.target.value)} className={field}>
           {!target && <option value="" disabled>Pilih siswa</option>}
           {(target ? [target] : options).map((s) => <option key={s.nis} value={s.nis}>{s.nama} ({s.nis})</option>)}
         </select>
@@ -71,9 +80,12 @@ function PresensiForm({ options, target, onSubmit, onCancel }: FormProps) {
         Status
         <select name="status" defaultValue={target?.status ?? ""} className={field}>
           <option value="" disabled>Pilih status</option>
-          {(Object.keys(STATUS_LABEL) as Status[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+          {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+            <option key={s} value={s} disabled={PRESENT.includes(s) && !presentAllowed}>{STATUS_LABEL[s]}</option>
+          ))}
         </select>
       </label>
+      {!presentAllowed && <p className="text-xs text-warning">Di luar jadwal atau sesi sedang dikunci: hanya Izin, Sakit, dan Alpa yang bisa dipilih tanpa izin Guru Piket.</p>}
       <label className="grid gap-2 text-sm font-medium">
         Keterangan
         <input name="keterangan" maxLength={120} defaultValue={target?.keterangan} placeholder="Opsional" className={field} />
@@ -91,6 +103,7 @@ export function KetuaKelasDashboard() {
   const ketuaName = getAccountRows().find((account) => account.role === "KETUA_KELAS" && account.kelasId === OWN_CLASS_ID)?.nama ?? "Ketua Kelas";
   const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const [date] = useState(getLocalDateKey);
+  const { activeSession, ready } = useAttendanceWindow();
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const savedAttendance = attendanceStore[`${date}::${OWN_CLASS_ID}`] ?? {};
   const students: Student[] = roster
@@ -128,8 +141,17 @@ export function KetuaKelasDashboard() {
 
   function save(nis: string, status: Status, keterangan: string) {
     const previous = savedAttendance[nis];
+    if (PRESENT.includes(status) && !canMarkPresent(activeSession !== null, Boolean(previous?.izinHadir))) {
+      setToast("Status Hadir/Terlambat di luar jadwal memerlukan izin Guru Piket.");
+      return;
+    }
     const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
-    records[nis] = { status, keterangan, waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null };
+    records[nis] = {
+      status,
+      keterangan,
+      waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null,
+      izinHadir: PRESENT.includes(status) ? false : previous?.izinHadir,
+    };
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
       setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;
@@ -170,6 +192,14 @@ export function KetuaKelasDashboard() {
         <div className="hidden gap-2 lg:flex">{actionButtons}</div>
       </div>
 
+      <p role="note" className={`rounded-md border px-4 py-3 text-sm ${activeSession ? "border-success/30 bg-success-soft text-success" : "border-warning/30 bg-warning-soft text-warning"}`}>
+        {!ready
+          ? "Memeriksa jadwal presensi..."
+          : activeSession
+            ? `Sesi ${activeSession} terbuka. Hadir dan Terlambat dapat dicatat.`
+            : "Di luar jam presensi atau sesi dikunci. Status Hadir/Terlambat memerlukan izin Guru Piket; Izin, Sakit, dan Alpa tetap dapat dicatat."}
+      </p>
+
       <div className="stat-grid [--stat-min:6rem]">
         <StatCard label="Jumlah Siswa" value={students.length} />
         <StatCard label="Hadir" value={count(...PRESENT)} color="success" />
@@ -206,7 +236,13 @@ export function KetuaKelasDashboard() {
       <div className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-line bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden">{actionButtons}</div>
 
       <Dialog open={dialog?.kind === "form"} title={target ? "Edit presensi" : "Tambah presensi"} onClose={close}>
-        <PresensiForm options={students} target={target} onSubmit={save} onCancel={close} />
+        <PresensiForm
+          options={students}
+          target={target}
+          presentAllowedFor={(nis) => canMarkPresent(activeSession !== null, Boolean(savedAttendance[nis]?.izinHadir))}
+          onSubmit={save}
+          onCancel={close}
+        />
       </Dialog>
 
       <Dialog open={dialog?.kind === "detail"} title="Detail presensi" onClose={close}>
