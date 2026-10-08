@@ -34,9 +34,9 @@ const VALUE_COLOR = { ink: "text-ink", success: "text-success", info: "text-info
 
 export function StatCard({ label, value, color = "ink", highlight }: { label: string; value: number; color?: keyof typeof VALUE_COLOR; highlight?: boolean }) {
   return (
-    <div className={`${card} p-4 ${highlight ? "border-warning bg-warning-soft" : ""}`}>
+    <div className={`${card} flex flex-col justify-between p-4 ${highlight ? "border-warning bg-warning-soft" : ""}`}>
       <p className="text-xs font-medium text-muted">{label}</p>
-      <p className={`mt-2 text-[2rem] font-semibold leading-10 ${VALUE_COLOR[color]}`}>{value}</p>
+      <p className={`mt-2 text-[2rem] font-semibold leading-10 tabular-nums tracking-tight ${VALUE_COLOR[color]}`}>{value}</p>
     </div>
   );
 }

@@ -16,7 +16,7 @@ const classes = getClasses();
 const jurusanList = [...new Set(classes.map((c) => c.jurusan))];
 
 function Num({ value, color }: { value: number; color: string }) {
-  return <td className={`${CELL} font-semibold ${value ? color : "text-muted"}`}>{value}</td>;
+  return <td className={`${CELL} text-center font-semibold tabular-nums ${value ? color : "text-muted"}`}>{value}</td>;
 }
 
 export function GuruPiketDashboard() {
@@ -99,9 +99,14 @@ export function GuruPiketDashboard() {
             <table className="w-full min-w-144 md:min-w-0 text-sm">
               <thead>
                 <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
-                  {["Kelas", "Siswa", "Hadir", "Izin", "Sakit", "Alpa", "Kehadiran", "Status"].map((h) => (
-                    <th key={h} scope="col" className={CELL}>{h}</th>
-                  ))}
+                  <th scope="col" className={CELL}>Kelas</th>
+                  <th scope="col" className={`${CELL} text-center`}>Siswa</th>
+                  <th scope="col" className={`${CELL} text-center`}>Hadir</th>
+                  <th scope="col" className={`${CELL} text-center`}>Izin</th>
+                  <th scope="col" className={`${CELL} text-center`}>Sakit</th>
+                  <th scope="col" className={`${CELL} text-center`}>Alpa</th>
+                  <th scope="col" className={CELL}>Kehadiran</th>
+                  <th scope="col" className={CELL}>Status</th>
                   <th scope="col" className={CELL}><span className="sr-only">Aksi</span></th>
                 </tr>
               </thead>
@@ -126,7 +131,7 @@ export function GuruPiketDashboard() {
                           <div role="progressbar" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100} aria-label={`Kehadiran ${c.nama}`} className="h-2 w-12 overflow-hidden xl:w-24 rounded-full bg-primary-soft">
                             <div className={`h-full ${bar}`} style={{ width: `${p}%` }} />
                           </div>
-                          <span className="font-semibold">{p}%</span>
+                          <span className="font-semibold tabular-nums">{p}%</span>
                         </div>
                       </td>
                       <td className={CELL}><Badge tone={progress.tone}>{progress.label}</Badge></td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { FilePlus } from "lucide-react";
 import { addDemoActivity } from "@/lib/activity-log";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
@@ -9,6 +10,7 @@ import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { btn, card, EmptyState, field, StatCard } from "@/components/ui";
 import { useAttendanceWindow } from "@/components/use-attendance-window";
 import { useRole } from "@/components/app-shell";
+import { SuratSakitModal } from "./surat-sakit-modal";
 
 const classes = getClasses();
 const statuses: Status[] = ["HADIR", "TERLAMBAT", "IZIN", "SAKIT", "ALPA"];
@@ -24,6 +26,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
   const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [suratSakitOpen, setSuratSakitOpen] = useState(false);
   const { activeSession, ready } = useAttendanceWindow();
   const savedAttendance = attendanceStore[`${date}::${classId}`] ?? {};
   const attendance = draft ?? savedAttendance;
@@ -152,6 +155,9 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         <label className={`${field} flex flex-1 items-center gap-2`}>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS siswa" aria-label="Cari siswa dalam kelas" className="w-full bg-transparent outline-none" />
         </label>
+        <button type="button" onClick={() => setSuratSakitOpen(true)} className={`${btn.outline} w-full sm:w-auto`}>
+          <FilePlus size={16} aria-hidden /> Submit Surat Sakit
+        </button>
         <button type="button" onClick={saveAttendance} disabled={draft === null} className={`${btn.primary} w-full sm:w-auto`}>
           Simpan presensi{done > 0 ? ` (${done} siswa)` : ""}
         </button>
@@ -236,6 +242,12 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
           </>
         )}
       </section>
+
+      <SuratSakitModal
+        open={suratSakitOpen}
+        onClose={() => setSuratSakitOpen(false)}
+        initialClassId={classId}
+      />
     </div>
   );
 }

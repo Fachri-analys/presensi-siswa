@@ -7,10 +7,11 @@ interface DialogProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  maxWidthClass?: string;
 }
 
 /** Modal berbasis <dialog> native: fokus, Esc, dan backdrop sudah ditangani browser. */
-export function Dialog({ open, title, onClose, children }: DialogProps) {
+export function Dialog({ open, title, onClose, children, maxWidthClass = "max-w-md" }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -26,7 +27,7 @@ export function Dialog({ open, title, onClose, children }: DialogProps) {
       ref={ref}
       aria-labelledby={titleId}
       onClose={onClose}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-line bg-surface p-0 text-ink backdrop:bg-primary/50"
+      className={`m-auto w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] ${maxWidthClass} max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-line bg-surface p-0 text-ink backdrop:bg-primary/50`}
     >
       {open && (
         <div className="p-6">

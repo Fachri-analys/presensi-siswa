@@ -11,6 +11,7 @@ import { useRole } from "@/components/app-shell";
 import { OWN_CLASS_ID } from "@/lib/mock";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceRecap, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
+import { SemesterAttendanceStats } from "@/components/semester-attendance-stats";
 
 const classes = getClasses();
 const jurusanList = [...new Set(classes.map((c) => c.jurusan))];
@@ -33,6 +34,7 @@ export default function LaporanPage() {
   const [landscape, setLandscape] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
+  const [activeTab, setActiveTab] = useState<"periode" | "semester">("periode");
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const demoStudents = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
 
@@ -249,7 +251,43 @@ export default function LaporanPage() {
     <div className="space-y-6">
       <style>{`@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 14mm 14mm 18mm; }`}</style>
 
-      <section className={`${card} grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 print:hidden`} aria-label="Filter laporan">
+      {/* Navigasi Tab Laporan */}
+      <div className="flex border-b border-line gap-2 overflow-x-auto whitespace-nowrap pb-px print:hidden" role="tablist" aria-label="Pilihan tampilan laporan">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "periode"}
+          onClick={() => setActiveTab("periode")}
+          className={`shrink-0 pb-3 pt-1 px-4 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+            activeTab === "periode"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Rekap Rentang Tanggal & Cetak
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "semester"}
+          onClick={() => setActiveTab("semester")}
+          className={`shrink-0 pb-3 pt-1 px-4 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+            activeTab === "semester"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Statistik Kehadiran Semester
+        </button>
+      </div>
+
+      {activeTab === "semester" ? (
+        <div className="print:hidden">
+          <SemesterAttendanceStats initialClassId={kelas.id} />
+        </div>
+      ) : (
+        <>
+          <section className={`${card} grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 print:hidden`} aria-label="Filter laporan">
         {role !== "KETUA_KELAS" && <>
             <Filter label="Jurusan">
               <select value={jurusan} onChange={(e) => setJurusan(e.target.value)} className={field}>
@@ -364,6 +402,8 @@ export default function LaporanPage() {
           </>
         )}
       </article>
+        </>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
@@ -13,6 +13,7 @@ import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
 import { btn, field, StatCard, StatusBadge } from "./ui";
 import { useAttendanceWindow } from "./use-attendance-window";
+import { SuratSakitModal } from "./surat-sakit-modal";
 
 // Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
 // dan pembatasan aksesnya tetap dipaksakan di backend.
@@ -121,6 +122,7 @@ export function KetuaKelasDashboard() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "BELUM" | "">("");
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [suratSakitOpen, setSuratSakitOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -175,8 +177,13 @@ export function KetuaKelasDashboard() {
 
   const actionButtons = (
     <>
-      <Link href="/laporan" className={btn.outline}>Buka laporan</Link>
-      <button type="button" onClick={() => setDialog({ kind: "form" })} className={`${btn.accent} flex-1 lg:flex-none`}>
+      <button type="button" onClick={() => setSuratSakitOpen(true)} className={`${btn.outline} px-2.5 sm:px-4 text-xs sm:text-sm`}>
+        <FilePlus size={16} aria-hidden /> Surat Sakit
+      </button>
+      <Link href="/laporan" className={`${btn.outline} px-2.5 sm:px-4 text-xs sm:text-sm`}>
+        Laporan
+      </Link>
+      <button type="button" onClick={() => setDialog({ kind: "form" })} className={`${btn.accent} flex-1 lg:flex-none px-3 sm:px-4 text-xs sm:text-sm`}>
         <Plus size={16} aria-hidden /> Tambah presensi
       </button>
     </>
@@ -186,8 +193,8 @@ export function KetuaKelasDashboard() {
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{kelas?.nama}</h1>
-          <p className="text-sm text-muted">Ketua Kelas: {ketuaName}</p>
+          <h1 className="text-2xl font-semibold">Presensi Kelas {kelas?.nama}</h1>
+          <p className="text-sm text-muted">Ketua Kelas: {ketuaName} · Kelola presensi dan surat sakit harian</p>
         </div>
         <div className="hidden gap-2 lg:flex">{actionButtons}</div>
       </div>
@@ -277,6 +284,12 @@ export function KetuaKelasDashboard() {
           {toast}
         </div>
       )}
+
+      <SuratSakitModal
+        open={suratSakitOpen}
+        onClose={() => setSuratSakitOpen(false)}
+        initialClassId={OWN_CLASS_ID}
+      />
     </div>
   );
 }

@@ -19,7 +19,7 @@ const ROLES: Record<Role, { label: string; note: string; initials: string }> = {
 const ALL: Role[] = ["KETUA_KELAS", "GURU_PIKET", "ADMIN"];
 const NAV: { href: string; label: string; icon: LucideIcon; roles: Role[] }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
-  { href: "/presensi", label: "Presensi", icon: ClipboardCheck, roles: ["KETUA_KELAS", "GURU_PIKET"] },
+  { href: "/presensi", label: "Presensi", icon: ClipboardCheck, roles: ["GURU_PIKET"] },
   { href: "/siswa", label: "Siswa", icon: Users, roles: ["KETUA_KELAS", "GURU_PIKET", "ADMIN"] },
   { href: "/guru", label: "Data Guru", icon: Users, roles: ["ADMIN"] },
   { href: "/kelas", label: "Kelas", icon: School, roles: ["ADMIN"] },
