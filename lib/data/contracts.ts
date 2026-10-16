@@ -1,4 +1,5 @@
 import type { AuditEntry, ClassSummary, HistoryRow, RecapRow, Role, Status, StudentRow } from "../types";
+export type { AuditEntry, ClassSummary, HistoryRow, RecapRow, Role, Status, StudentRow };
 
 export interface SessionUser {
   id: string;

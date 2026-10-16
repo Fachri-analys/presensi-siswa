@@ -8,6 +8,12 @@ import { validationSchema } from './config/validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { StudentsModule } from './modules/students/students.module';
+import { ClassesModule } from './modules/classes/classes.module';
+import { TeachersModule } from './modules/teachers/teachers.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { SickLettersModule } from './modules/sick-letters/sick-letters.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
@@ -26,6 +32,12 @@ import { RolesGuard } from './common/guards/roles.guard';
     PrismaModule,
     HealthModule,
     AuthModule,
+    StudentsModule,
+    ClassesModule,
+    TeachersModule,
+    AttendanceModule,
+    MonitoringModule,
+    SickLettersModule,
   ],
   providers: [
     {
