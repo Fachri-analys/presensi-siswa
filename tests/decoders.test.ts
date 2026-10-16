@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiDecodeError, decodeAttendanceRecord, decodeAttendanceReport } from "../lib/data/decoders";
+import { ApiDecodeError, decodeAttendanceRecord, decodeAttendanceReport, decodeAuditEntry } from "../lib/data/decoders";
 
 const record = {
   id: "attendance-1",
@@ -37,4 +37,24 @@ describe("decoder tanggal dan waktu backend", () => {
     expect(() => decodeAttendanceRecord({ ...record, waktu: "7:05" })).toThrow(ApiDecodeError);
     expect(() => decodeAttendanceRecord({ ...record, waktu: "24:00" })).toThrow(ApiDecodeError);
   });
+
+  it("mendecode AuditEntry dengan benar dan menangani actor null", () => {
+    const validEntry = {
+      id: "log-1",
+      action: "Login",
+      objectType: "User",
+      objectId: "usr-1",
+      result: "SUCCESS",
+      requestId: "req-123",
+      createdAt: "2026-10-16T12:00:00.000Z",
+      actor: { id: "usr-1", nama: "Admin", role: "ADMIN" },
+    };
+    const decoded = decodeAuditEntry(validEntry);
+    expect(decoded.actorName).toBe("Admin");
+    expect(decoded.action).toBe("Login");
+
+    const noActor = decodeAuditEntry({ ...validEntry, actor: null });
+    expect(noActor.actorName).toBe("Sistem");
+  });
 });
+

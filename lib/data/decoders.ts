@@ -1,4 +1,4 @@
-import type { ClassSummary, HistoryRow, RecapRow, Role, Status } from "../types";
+import type { AuditEntry, ClassSummary, HistoryRow, RecapRow, Role, Status } from "../types";
 import type {
   AttendanceReport,
   AttendanceRecord,
@@ -211,3 +211,21 @@ export function decodeAttendanceReport(value: unknown): AttendanceReport {
     rows: data.rows.map(decodeRecapRow),
   };
 }
+
+export function decodeAuditEntry(value: unknown): AuditEntry {
+  const data = object(value, "auditEntry");
+  const actor = data.actor && typeof data.actor === "object" ? (data.actor as Record<string, unknown>) : null;
+  return {
+    id: text(data.id, "auditEntry.id"),
+    actorId: actor ? text(actor.id, "auditEntry.actor.id") : "",
+    actorName: actor ? text(actor.nama, "auditEntry.actor.nama") : "Sistem",
+    action: text(data.action, "auditEntry.action"),
+    objectType: text(data.objectType, "auditEntry.objectType"),
+    objectId: optionalText(data.objectId, "auditEntry.objectId") ?? "",
+    result: text(data.result, "auditEntry.result"),
+    requestId: optionalText(data.requestId, "auditEntry.requestId"),
+    createdAt: text(data.createdAt, "auditEntry.createdAt"),
+  };
+}
+
+

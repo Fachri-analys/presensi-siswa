@@ -14,6 +14,8 @@ import { TeachersModule } from './modules/teachers/teachers.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { SickLettersModule } from './modules/sick-letters/sick-letters.module';
+import { UsersModule } from './modules/users/users.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
@@ -38,6 +40,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     AttendanceModule,
     MonitoringModule,
     SickLettersModule,
+    UsersModule,
+    AuditLogsModule,
   ],
   providers: [
     {

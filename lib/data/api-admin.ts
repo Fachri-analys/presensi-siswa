@@ -80,28 +80,82 @@ export function createApiAdminRepository(fetcher?: typeof fetch): AdminRepositor
       );
     },
 
-    async listAccounts(_query?: PaginationQuery, _signal?: AbortSignal): Promise<Page<SchoolAccount>> {
-      return { items: [], nextCursor: null, total: 0 };
+    async listAccounts(query?: PaginationQuery, signal?: AbortSignal): Promise<Page<SchoolAccount>> {
+      return request(
+        "users",
+        {
+          method: "GET",
+          query: {
+            page: query?.cursor ? Number(query.cursor) : 1,
+            limit: query?.limit ?? 20,
+            search: query?.search,
+            status: query?.status === "all" ? undefined : query?.status,
+          },
+          signal,
+        },
+        (val: unknown) => decodePage(val, decodeAccount),
+      );
     },
 
-    async createAccount(_input: CreateAccountInput, _signal?: AbortSignal): Promise<SchoolAccount> {
-      throw new Error("Method not implemented.");
+    async createAccount(input: CreateAccountInput, signal?: AbortSignal): Promise<SchoolAccount> {
+      return request(
+        "users",
+        {
+          method: "POST",
+          body: input,
+          signal,
+        },
+        decodeAccount,
+      );
     },
 
-    async updateAccount(_id: string, _input: CreateAccountInput, _signal?: AbortSignal): Promise<SchoolAccount> {
-      throw new Error("Method not implemented.");
+    async updateAccount(id: string, input: CreateAccountInput, signal?: AbortSignal): Promise<SchoolAccount> {
+      return request(
+        `users/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          body: input,
+          signal,
+        },
+        decodeAccount,
+      );
     },
 
-    async setAccountActive(_id: string, _active: boolean, _signal?: AbortSignal): Promise<SchoolAccount> {
-      throw new Error("Method not implemented.");
+    async setAccountActive(id: string, active: boolean, signal?: AbortSignal): Promise<SchoolAccount> {
+      return request(
+        `users/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          body: { status: active ? "active" : "inactive" },
+          signal,
+        },
+        decodeAccount,
+      );
     },
 
-    async deleteAccount(_id: string, _signal?: AbortSignal): Promise<void> {
-      throw new Error("Method not implemented.");
+    async deleteAccount(id: string, signal?: AbortSignal): Promise<void> {
+      return request(
+        `users/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          signal,
+        },
+        () => undefined,
+      );
     },
 
-    async requestPasswordReset(_userId: string, _signal?: AbortSignal): Promise<{ accepted: boolean }> {
-      return { accepted: true };
+    async requestPasswordReset(userId: string, signal?: AbortSignal): Promise<{ accepted: boolean }> {
+      return request(
+        `users/${encodeURIComponent(userId)}/reset-password`,
+        {
+          method: "POST",
+          signal,
+        },
+        (val: unknown) => {
+          const res = val as { accepted?: boolean };
+          return { accepted: Boolean(res?.accepted) };
+        },
+      );
     },
   };
 }
