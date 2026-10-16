@@ -1,10 +1,10 @@
-# Usulan Kontrak API
+# Kontrak API Resmi (API Specification)
 
-- **Status:** Draf untuk disepakati backend dan frontend
+- **Status:** Final & Terintegrasi
 - **Produk:** Sistem Presensi Siswa — SMK Negeri 11 Jakarta
-- **Versi usulan:** `v1`
+- **Versi:** `v1`
 
-Dokumen ini membantu memulai diskusi integrasi. Ini **bukan** spesifikasi server final. Perubahan dari usulan harus disepakati dan dicatat di sini sebelum adapter frontend dianggap stabil.
+Dokumen ini merupakan spesifikasi API backend resmi yang diimplementasikan pada NestJS (`/api/v1`) dan digunakan oleh Next.js frontend adapter (`lib/data/*`). Dokumentasi OpenAPI/Swagger interaktif tersedia di `/api/docs`.
 
 ## 1. Prinsip kontrak
 
@@ -186,10 +186,16 @@ Tanggal dan kelas berada pada path agar server memvalidasinya sebagai scope batc
 | Method | Path | Kegunaan |
 |---|---|---|
 | `GET` | `/attendance/history?kelasId=&from=&to=` | Ringkasan harian dalam cakupan |
-| `GET` | `/reports/attendance?kelasId=&from=&to=&status=` | Rekap laporan |
-| `GET` | `/audit-logs?cursor=&limit=&from=&to=&actorId=` | Membaca audit bagi Guru Piket/Admin sesuai kebijakan |
+| `GET` | `/attendance/recap?kelasId=&from=&to=` | Rekapitulasi laporan kehadiran |
+| `GET` | `/monitoring/classes/summary?date=YYYY-MM-DD` | Ringkasan kehadiran seluruh rombel per tanggal |
+| `GET` | `/audit-logs?cursor=&limit=&from=&to=&actorId=` | Membaca audit bagi Guru Piket/Admin |
 
-PDF/cetak dan workbook Excel saat ini dapat dibuat frontend dari data laporan yang telah diterima. Jika data terlalu besar atau kebijakan mengharuskan ekspor server-side, tentukan endpoint unduhan, format, batas ukuran, dan audit akses ekspor sebelum implementasi.
+### Surat Izin / Sakit
+
+| Method | Path | Format | Kegunaan |
+|---|---|---|---|
+| `POST` | `/sick-letters/upload` | `multipart/form-data` | Unggah surat dokter/izin (`file`, `date`, `kelasId`, `studentId`, `keterangan`). Validasi MIME (PDF/JPG/PNG), batas 5 MB, sanitasi UUID, proteksi IDOR. |
+| `GET` | `/sick-letters/class/{kelasId}` | `application/json` | Daftar riwayat surat izin/sakit untuk kelas terkait. |
 
 ## 4. Bentuk data utama usulan
 

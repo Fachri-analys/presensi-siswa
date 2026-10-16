@@ -93,3 +93,47 @@ npm run typecheck
 # Build produksi
 npm run build
 ```
+
+---
+
+## Docker & Deployment Produksi
+
+Backend ini dilengkapi multi-stage `Dockerfile` dengan non-root user (`nestjs`, UID 1001) untuk keamanan produksi:
+
+```bash
+# Build image Docker backend
+docker build -t presensi-backend:latest .
+
+# Menjalankan container backend
+docker run -d \
+  --name presensi-api \
+  -p 4000:4000 \
+  --env-file .env \
+  presensi-backend:latest
+```
+
+---
+
+## Backup & Restore Database
+
+### Pencadangan (Backup)
+```bash
+docker exec -t presensi-postgres pg_dump -U presensi -d presensi_dev --format=custom --blobs | gzip > backup_$(date +%Y%m%d_%H%M%S).dump.gz
+```
+
+### Pemulihan (Restore)
+```bash
+gunzip -c backup_YYYYMMDD_HHMMSS.dump.gz > restore.dump
+docker exec -i presensi-postgres pg_restore -U presensi -d presensi_dev --clean --if-exists restore.dump
+```
+
+---
+
+## Akun Pengujian & Seeding
+
+Kredensial akun pengujian dikonfigurasi melalui environment variable lokal tanpa membocorkan password ke source code (`.env.test.local` / `.env`):
+- `TEST_ADMIN_PASSWORD` (Admin: `admin.test@smkn11jakarta.sch.id`)
+- `TEST_GURU_PASSWORD` (Guru Piket: `guru.test@smkn11jakarta.sch.id`)
+- `TEST_KETUA_PASSWORD` (Ketua Kelas: `ketua.test@smkn11jakarta.sch.id`)
+
+Jika environment variable tidak diset saat `npm run prisma:seed`, seed akan menghasilkan token acak aman via `crypto.randomBytes`.

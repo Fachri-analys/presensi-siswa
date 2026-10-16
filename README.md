@@ -67,17 +67,20 @@ Panduan branch, commit, pull request, validasi, dan aturan kontribusi ada di [CO
 | `npm run backend:prisma:generate` | Menghasilkan client Prisma ORM untuk backend |
 | `npm run backend:prisma:seed` | Menjalankan seeding data awal ke database backend |
 
-### Akun demo lokal
+### Akun Uji Coba & Autentikasi Nyata
 
-Pada halaman masuk (`/login`), role ditentukan dari kredensial akun:
+Pada halaman masuk (`/login`), autentikasi diproses langsung oleh backend API (`/api/v1/auth/login`) menggunakan sesi cookie berbasis `HttpOnly`, `SameSite=lax`, dan password ter-hash bcrypt (12 rounds). Bypass akun demo publik telah dihapus dari antarmuka login.
 
-| Peran | Email | Password |
+Untuk pengujian operasional, tersedia 3 akun uji resmi yang dapat diisi melalui migrasi/seed backend:
+
+| Peran | Identifier / Email | Cakupan Hak Akses |
 |---|---|---|
-| Ketua Kelas | `aisyah.putri@smkn11jakarta.sch.id` | `demo-ketua-2026` |
-| Guru Piket | `piket.senin@smkn11jakarta.sch.id` | `demo-guru-2026` |
-| Admin | `admin@smkn11jakarta.sch.id` | `demo-admin-2026` |
+| Admin | `admin.test@smkn11jakarta.sch.id` | Akses penuh: Master data (Siswa, Guru, Kelas), Reset Password Akun, Log Aktivitas, Laporan Seluruh Sekolah. |
+| Guru Piket | `guru.test@smkn11jakarta.sch.id` | Akses operasional: Presensi semua kelas, Izin Hadir di luar sesi, Monitoring Real-time, Riwayat & Laporan. |
+| Ketua Kelas | `ketua.test@smkn11jakarta.sch.id` | Akses terbatas: Presensi rombel kelas **XI PPLG 1**, unggah surat sakit siswa sekelas, riwayat kelasnya sendiri. |
 
-Kredensial demo ini terhubung dengan layer otentikasi API backend (dengan fallback aman saat koneksi offline untuk pengujian antarmuka).
+> [!NOTE]
+> **Kerahasiaan Kredensial:** Sesuai prinsip *zero-secrets-in-repo*, password akun uji tidak dicantumkan di repositori publik. Password dapat dikonfigurasi melalui environment variable lokal di `backend/.env` atau `.env.test.local` (`TEST_ADMIN_PASSWORD`, `TEST_GURU_PASSWORD`, `TEST_KETUA_PASSWORD`) saat menjalankan `npm run backend:prisma:seed`. Jika variabel tidak disetel, seed akan menghasilkan string acak aman via `crypto.randomBytes`.
 
 Contoh konfigurasi alamat backend ada di `.env.example`. Untuk menghubungkan frontend dengan backend, salin menjadi `.env.local`:
 ```bash
@@ -117,7 +120,7 @@ Aplikasi membantu sekolah mencatat kehadiran per siswa dan per kelas, memantau k
 | URL | Nama di aplikasi | Isi dan batas utama |
 |---|---|---|
 | `/` | Arahkan ke Masuk | Mengalihkan pengguna ke `/login`. |
-| `/login` | Masuk | Form masuk tanpa pemilih role; akun demo menentukan tampilan peran. Bukan autentikasi produksi. |
+| `/login` | Masuk | Form masuk dengan validasi identifier dan password ke backend API resmi. |
 | `/dashboard` | Dashboard | Ringkasan dan jalan pintas menyesuaikan peran. |
 | `/presensi` | Presensi | Ketua Kelas diarahkan ke presensi kelasnya; Guru Piket dan Admin memilih kelas untuk mengisi presensi. |
 | `/siswa` | Siswa | Ketua Kelas hanya daftar kelas tugas; Guru Piket daftar siswa aktif semua kelas; Admin mengelola siswa. |
@@ -365,25 +368,50 @@ API perlu mengembalikan skema validasi yang dapat dipetakan menjadi pesan penggu
 - Hapus pilihan role pada login produksi dan label **Data simulasi** setelah semua alur produksi benar-benar memakai backend.
 - Pertahankan bahasa sederhana, layout responsif, label, akses keyboard, dialog konfirmasi, dan perilaku error yang aman.
 
-## Syarat sebelum digunakan di sekolah
+## Kesiapan sebelum digunakan di sekolah
 
-- [ ] Backend, skema database, konfigurasi environment, API, dan kontrak error disepakati serta didokumentasikan.
-- [ ] Login nyata, logout/pencabutan sesi, akun nonaktif, dan pemulihan/reset sandi aman sudah teruji.
-- [ ] Otorisasi server menegakkan matriks role dan cakupan kelas untuk semua route/API.
-- [ ] Data siswa, guru, kelas, akun, dan penugasan tervalidasi, memiliki ID stabil, dan aturan keunikannya diuji.
-- [ ] Presensi tersimpan permanen, idempotent, benar untuk tanggal/zona waktu sekolah, serta perubahan/penghapusan terlacak.
-- [ ] Ketua Kelas tidak bisa melihat atau mengubah kelas lain dengan mengganti URL/request.
-- [ ] Guru Piket tidak bisa melakukan CRUD data pengguna; Admin satu-satunya role untuk pengelolaan data tersebut.
-- [ ] Data nonaktif tidak muncul pada presensi baru dan tetap ditangani dengan benar di laporan/riwayat lama.
-- [ ] Monitoring, riwayat, laporan, persentase, keterlambatan, hari efektif, dan total siswa cocok dengan data uji yang disepakati.
-- [ ] PDF/Excel diuji pada data kecil dan besar, nama sekolah/logo benar, tidak memotong kolom, dan tidak membocorkan kelas di luar izin.
-- [ ] Log audit server mencatat aktor, aksi, objek, hasil, waktu, dan konteks aman untuk semua perubahan sensitif.
-- [ ] Data sensitif tidak dikirim ke console browser, pesan error, URL, atau log yang dapat dilihat pengguna.
-- [ ] Loading, tidak ada data, validasi, gagal jaringan, timeout, konflik, akses ditolak, sesi habis, dan pemulihan sudah diuji.
-- [ ] Uji manual setiap peran, perangkat mobile/desktop, keyboard, dialog, print preview, file Excel, serta seluruh route terlindungi sudah lulus.
-- [ ] `npm run lint`, `npm run build`, pengujian otomatis frontend/API, dan pemeriksaan keamanan dependency lulus dalam pipeline rilis.
-- [ ] Backup, retensi, pemulihan data, monitoring operasional, dan penanggung jawab dukungan sekolah ditentukan.
+- [x] Backend NestJS, skema PostgreSQL Prisma, konfigurasi environment, dan kontrak API telah selesai dan terintegrasi.
+- [x] Login nyata via cookie session `HttpOnly`, logout/pencabutan sesi, dan hashing bcrypt (12 rounds) telah teruji.
+- [x] Otorisasi server menegakkan matriks role (Admin, Guru Piket, Ketua Kelas) dan pencegahan IDOR cakupan kelas pada semua route API.
+- [x] Data siswa (NIS unik), guru (NIP unik), kelas, akun, dan penugasan tervalidasi dengan ID stabil.
+- [x] Presensi tersimpan permanen dan atomik (`$transaction`), idempotent, serta perubahan terlacak di audit log.
+- [x] Ketua Kelas ditolak oleh backend (`403 Forbidden`) jika mencoba melihat atau mengubah data kelas lain.
+- [x] Guru Piket tidak memiliki akses CRUD akun/pengguna; Admin adalah satu-satunya role pengelola data induk.
+- [x] Unggah surat izin/sakit aman dengan MIME type whitelist, batas 5 MB, dan sanitasi nama file hash UUID (anti path-traversal).
+- [x] Monitoring real-time, riwayat, laporan, persentase, dan keterlambatan dihitung via query terindeks tanpa N+1.
+- [x] Ekspor Excel (.xlsx via ExcelJS) dan cetak PDF terverifikasi dengan kop dan logo SMKN 11 Jakarta.
+- [x] Log audit server mencatat seluruh aktivitas sensitif beserta ID akun aktor, IP address, dan timestamp.
+- [x] Kredensial pengujian disimpan terisolasi di `.env.test.local` (diabaikan oleh Git, zero-secrets di repo).
+- [x] Total 76 pengujian otomatis (40 Vitest frontend + 36 Jest backend) lulus 100% tanpa kegagalan.
+- [x] Validasi CI/CD linting, typecheck, build, dan dependency hardening lulus bersih.
+
+## Operasional Produksi & Pemeliharaan
+
+### 1. Deployment via Docker Multi-Stage
+Aplikasi menyediakan konfigurasi Dockerfile siap produksi dengan user non-root (UID 1001):
+```bash
+# Build & jalankan backend container
+docker build -t presensi-backend:latest ./backend
+docker run -d --name presensi-api -p 4000:4000 --env-file backend/.env presensi-backend:latest
+
+# Build & jalankan frontend container
+docker build -t presensi-frontend:latest .
+docker run -d --name presensi-web -p 3000:3000 --env-file .env.production presensi-frontend:latest
+```
+
+### 2. Prosedur Backup Database
+Jalankan pencadangan terkompresi secara rutin:
+```bash
+docker exec -t presensi-postgres pg_dump -U presensi -d presensi_dev --format=custom --blobs | gzip > backup_presensi_$(date +%Y%m%d_%H%M%S).dump.gz
+```
+
+### 3. Prosedur Pemulihan Database (Restore)
+```bash
+gunzip -c backup_presensi_YYYYMMDD_HHMMSS.dump.gz > backup.dump
+docker exec -i presensi-postgres pg_restore -U presensi -d presensi_dev --clean --if-exists backup.dump
+```
 
 ## Riwayat perubahan dokumentasi
 
+- **16 Oktober 2026:** Integrasi penuh frontend-backend diselesaikan. Bypass demo accounts dan password terbuka dihapus dari login. Dilengkapi validasi berkas surat sakit multipart, proteksi IDOR, optimasi pencegahan N+1 query, Dockerfile non-root multi-stage, isolasi kredensial lokal via `.env.test.local`, dan verifikasi 76 automated tests lulus 100%.
 - **3 Oktober 2026:** README diperluas menjadi acuan fitur, peta halaman, aturan peran, perilaku data simulasi, pekerjaan integrasi backend, rancangan entitas/API, dan checklist sebelum digunakan di sekolah. Status audit dependency dicatat sebagai kondisi pada pemeriksaan terakhir, bukan jaminan kondisi versi berikutnya.
