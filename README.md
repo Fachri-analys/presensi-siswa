@@ -25,11 +25,6 @@ Sistem Informasi Presensi Siswa terintegrasi berbasis monorepo untuk **SMK Neger
 - **Ekspor Dokumen Berstandar Sekolah:**
   - **Excel (`.xlsx`):** Lembar kerja berformat rapi lengkap dengan kop sekolah SMKN 11 Jakarta, logo resmi, dan kalkulasi persentase otomatis menggunakan `exceljs`.
   - **Cetak Laporan (PDF):** Layout dokumen ramah cetak (`@media print`) yang siap dicetak langsung atau disimpan sebagai PDF dinas.
-- **Keamanan & Performa:**
-  - Sesi berbasis cookie `HttpOnly` dengan enkripsi token SHA-256.
-  - Password terenkripsi bcrypt (12 salt rounds).
-  - Optimasi database bebas N+1 query melalui query eager-loading dan Prisma indexing.
-  - Proteksi Helmet, anti-CSRF, dan rate-limiting.
 
 ---
 
@@ -38,20 +33,7 @@ Sistem Informasi Presensi Siswa terintegrasi berbasis monorepo untuk **SMK Neger
 Aplikasi dibangun menggunakan pola arsitektur **Monorepo**:
 
 ```text
-presensi-siswa/
-├── app/                  # Frontend Next.js 16 (App Router)
-│   ├── (app)/            # Halaman terproteksi (Dashboard, Presensi, Siswa, Guru, dll.)
-│   └── login/            # Halaman autentikasi login
-├── components/           # Komponen UI responsif & reusable
-├── lib/                  # Adapter data, kontrak antarmuka API, & decoder
-├── backend/              # Backend API NestJS 10
-│   ├── src/modules/      # Modul domain (auth, attendance, students, sick-letters, dll.)
-│   ├── prisma/           # Skema database relasional & skrip seeding
-│   └── docker/           # Inisialisasi PostgreSQL container
-├── docs/                 # Dokumentasi teknis mendalam (PRD, SRS, API Contract)
-├── tests/                # Automated unit & integration tests frontend (Vitest)
-└── .github/workflows/    # Automasi CI/CD pipeline multi-job
-```
+
 
 ---
 
