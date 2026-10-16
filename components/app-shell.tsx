@@ -9,6 +9,7 @@ import { clearDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot, sub
 import { getClass, OWN_CLASS_ID } from "@/lib/mock";
 import type { Role } from "@/lib/types";
 import { Logo } from "./logo";
+import { createApiAuthRepository } from "@/lib/data/api-auth";
 
 const ROLES: Record<Role, { label: string; note: string; initials: string }> = {
   KETUA_KELAS: { label: "Ketua Kelas", note: "Kelas tugas", initials: "KK" },
@@ -64,6 +65,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   function logout() {
     addDemoActivity("Keluar dari aplikasi", `${ROLES[role].label} keluar dari sistem presensi.`);
+    const authRepo = createApiAuthRepository();
+    if (authRepo) {
+      authRepo.logout().catch((err) => {
+        console.warn("Gagal logout dari server backend:", err);
+      });
+    }
     clearDemoSession();
     setOpen(false);
     router.replace("/login");

@@ -7,22 +7,29 @@ import { btn, field } from "@/components/ui";
 import { ROLE_LABEL, type Role } from "@/lib/types";
 import { getDemoSessionRole, setDemoSessionRole } from "@/lib/demo-session";
 
+import { createApiAuthRepository } from "@/lib/data/api-auth";
+import { apiErrorMessage } from "@/lib/data/api-client";
+
 const DEMO_ACCOUNTS: { identifier: string; password: string; role: Role }[] = [
   { identifier: "aisyah.putri@smkn11jakarta.sch.id", password: "demo-ketua-2026", role: "KETUA_KELAS" },
   { identifier: "piket.senin@smkn11jakarta.sch.id", password: "demo-guru-2026", role: "GURU_PIKET" },
   { identifier: "admin@smkn11jakarta.sch.id", password: "demo-admin-2026", role: "ADMIN" },
+  { identifier: "admin@smkn11jakarta.sch.id", password: "Admin#2026", role: "ADMIN" },
+  { identifier: "piket.senin@smkn11jakarta.sch.id", password: "Guru#2026", role: "GURU_PIKET" },
+  { identifier: "aisyah.putri@smkn11jakarta.sch.id", password: "Ketua#2026", role: "KETUA_KELAS" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (getDemoSessionRole()) router.replace("/dashboard");
   }, [router]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const identifier = String(data.get("identifier") ?? "").trim();
@@ -31,18 +38,53 @@ export default function LoginPage() {
       setError("Isi username/email dan password untuk melanjutkan.");
       return;
     }
+
+    setLoading(true);
+    const authRepo = createApiAuthRepository();
+
+    if (authRepo) {
+      try {
+        const sessionUser = await authRepo.login({ identifier, password });
+        setDemoSessionRole(sessionUser.role);
+        router.push("/dashboard");
+        return;
+      } catch (err: unknown) {
+        // Jika error dari backend (kredensial salah / unauthenticated / forbidden), tampilkan error backend
+        const isAuthError = typeof err === "object" && err !== null && "status" in err && (err.status === 401 || err.status === 403);
+        if (isAuthError) {
+          setError("Email atau password tidak sesuai.");
+          setLoading(false);
+          return;
+        }
+        // Jika terjadi error jaringan/backend belum running, coba fallback demo accounts
+        const account = DEMO_ACCOUNTS.find(
+          (demoAccount) => demoAccount.identifier === identifier.toLowerCase() && demoAccount.password === password,
+        );
+        if (account) {
+          setDemoSessionRole(account.role);
+          router.push("/dashboard");
+          return;
+        }
+        setError(apiErrorMessage(err));
+        setLoading(false);
+        return;
+      }
+    }
+
     const account = DEMO_ACCOUNTS.find(
       (demoAccount) => demoAccount.identifier === identifier.toLowerCase() && demoAccount.password === password,
     );
     if (!account) {
-      setError("Email atau password akun demo tidak sesuai.");
+      setError("Email atau password tidak sesuai.");
+      setLoading(false);
       return;
     }
     try {
       setDemoSessionRole(account.role);
     } catch (error) {
-      console.error("Sesi demo tidak dapat disimpan.", error);
+      console.error("Sesi tidak dapat disimpan.", error);
       setError("Sesi masuk tidak dapat disimpan di browser ini. Periksa pengaturan penyimpanan browser lalu coba lagi.");
+      setLoading(false);
       return;
     }
     router.push("/dashboard");
@@ -99,7 +141,9 @@ export default function LoginPage() {
           </label>
 
           {error && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
-          <button type="submit" className={`${btn.primary} h-12 w-full`}>Login</button>
+          <button type="submit" disabled={loading} className={`${btn.primary} h-12 w-full disabled:opacity-60`}>
+            {loading ? "Memproses..." : "Login"}
+          </button>
           <details className="rounded-md border border-line px-4 py-3 text-sm">
             <summary className="cursor-pointer font-medium text-primary">Akun demo untuk setiap peran</summary>
             <dl className="mt-3 space-y-3 text-xs">

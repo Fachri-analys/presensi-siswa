@@ -8,7 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backend:dev": "npm --prefix backend run start:dev",
+    "backend:build": "npm --prefix backend run build",
+    "backend:test": "npm --prefix backend run test",
+    "backend:prisma:generate": "npm --prefix backend run prisma:generate",
+    "backend:prisma:seed": "npm --prefix backend run prisma:seed",
+    "docker:db": "docker compose -f backend/docker-compose.yml up -d postgres",
+    "docker:db:down": "docker compose -f backend/docker-compose.yml down"
   },
   "engines": {
     "node": ">=20.9"
