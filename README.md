@@ -25,7 +25,6 @@ Sistem Informasi Presensi Siswa terintegrasi berbasis monorepo untuk **SMK Neger
 - **Ekspor Dokumen Berstandar Sekolah:**
   - **Excel (`.xlsx`):** Lembar kerja berformat rapi lengkap dengan kop sekolah SMKN 11 Jakarta, logo resmi, dan kalkulasi persentase otomatis menggunakan `exceljs`.
   - **Cetak Laporan (PDF):** Layout dokumen ramah cetak (`@media print`) yang siap dicetak langsung atau disimpan sebagai PDF dinas.
-
 ---
 
 ## 🏗️ Arsitektur Sistem
@@ -33,10 +32,6 @@ Sistem Informasi Presensi Siswa terintegrasi berbasis monorepo untuk **SMK Neger
 Aplikasi dibangun menggunakan pola arsitektur **Monorepo**:
 
 ```text
-
-
----
-
 ## 🚀 Panduan Memulai Cepat
 
 ### Prasyarat
