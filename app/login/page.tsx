@@ -14,9 +14,6 @@ const DEMO_ACCOUNTS: { identifier: string; password: string; role: Role }[] = [
   { identifier: "aisyah.putri@smkn11jakarta.sch.id", password: "demo-ketua-2026", role: "KETUA_KELAS" },
   { identifier: "piket.senin@smkn11jakarta.sch.id", password: "demo-guru-2026", role: "GURU_PIKET" },
   { identifier: "admin@smkn11jakarta.sch.id", password: "demo-admin-2026", role: "ADMIN" },
-  { identifier: "admin@smkn11jakarta.sch.id", password: "Admin#2026", role: "ADMIN" },
-  { identifier: "piket.senin@smkn11jakarta.sch.id", password: "Guru#2026", role: "GURU_PIKET" },
-  { identifier: "aisyah.putri@smkn11jakarta.sch.id", password: "Ketua#2026", role: "KETUA_KELAS" },
 ];
 
 export default function LoginPage() {
