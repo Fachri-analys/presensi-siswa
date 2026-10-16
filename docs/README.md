@@ -1,29 +1,51 @@
-# Dokumentasi Proyek
+# Dokumentasi Sistem Presensi Siswa
 
-Dokumen ini adalah titik awal untuk memahami kebutuhan produk dan memulai pekerjaan backend.
+Dokumentasi spesifikasi produk, sistem, arsitektur, dan integrasi API untuk Sistem Presensi Siswa SMK Negeri 11 Jakarta.
 
 | Dokumen | Tujuan |
 |---|---|
-| [PRD.md](./PRD.md) | Tujuan produk, pengguna, ruang lingkup, alur utama, dan aturan bisnis. |
-| [SRS.md](./SRS.md) | Persyaratan sistem fungsional/nonfungsional dan kriteria penerimaan. |
-| [API-CONTRACT.md](./API-CONTRACT.md) | Usulan resource, endpoint, payload, respons, error, dan autentikasi API. |
-| [BACKEND-HANDOFF.md](./BACKEND-HANDOFF.md) | Panduan kerja bersama, pembagian tanggung jawab, keputusan yang sudah ditetapkan, dan checklist integrasi. |
+| [PRD.md](./PRD.md) | Tujuan produk, persona pengguna, ruang lingkup, alur utama, dan aturan bisnis presensi. |
+| [SRS.md](./SRS.md) | Persyaratan sistem fungsional, nonfungsional, keamanan, dan kriteria penerimaan. |
+| [API-CONTRACT.md](./API-CONTRACT.md) | Spesifikasi lengkap resource, endpoint, payload request/response, kode error, dan autentikasi API. |
+| [BACKEND-HANDOFF.md](./BACKEND-HANDOFF.md) | Panduan arsitektur backend, keputusan desain database, eager loading, dan checklist integrasi. |
 
-Panduan kontribusi repository ada di [../CONTRIBUTING.md](../CONTRIBUTING.md).
+Panduan alur kontribusi dan standar kode repository ada di [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Status dokumen dan implementasi
+---
 
-- Dokumen ini merangkum kebutuhan yang telah disampaikan pemilik produk dan kondisi frontend saat ini.
-- Kontrak endpoint adalah **usulan untuk disepakati bersama** sebelum implementasi, bukan API yang sudah tersedia.
-- Frontend masih memakai data demo. Fondasi `lib/data/contracts.ts`, `lib/data/api-client.ts`, dan `lib/data/decoders.ts` belum dipakai oleh halaman.
-- Perubahan kebutuhan yang disepakati harus diperbarui di dokumen terkait dan dicatat pada bagian keputusan di PRD atau handoff.
-- Backend tidak boleh menganggap pembatasan UI sebagai kontrol akses; semua otorisasi dilakukan server.
+## Status Arsitektur Monorepo
 
-## Urutan mulai yang disarankan
+Repository ini mengintegrasikan seluruh ekosistem aplikasi ke dalam satu repository (monorepo):
+1. **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4. Terletak di root directory.
+2. **Backend**: NestJS 10, Prisma ORM 5, PostgreSQL 16, TypeScript. Terletak di direktori [`../backend`](../backend).
+3. **Database & Container**: Konfigurasi Docker Compose untuk PostgreSQL dan skrip inisialisasi tersedia di [`../backend/docker-compose.yml`](../backend/docker-compose.yml).
+4. **API Integration Layer**: Terletak di [`../lib/data`](../lib/data), menyediakan kontrak antarmuka (`contracts.ts`), decoder type-safe (`decoders.ts`), dan repository API adapter (`api-auth.ts`, `api-school.ts`, `api-attendance.ts`, `api-monitoring.ts`, `api-admin.ts`, `api-activity.ts`).
+5. **CI/CD**: GitHub Actions workflow terintegrasi (`.github/workflows/ci.yml`) yang memvalidasi linting, typechecking, build, dan automated testing untuk Frontend dan Backend pada setiap push dan pull request.
 
-1. Baca PRD dan sepakati aturan produk yang belum ditentukan.
-2. Baca SRS dan setujui kriteria penerimaan untuk MVP.
-3. Finalkan API contract, skema data, metode autentikasi, dan kebijakan tanggal.
-4. Implementasikan backend beserta migrasi, validasi, otorisasi server, audit log, dan test.
-5. Sediakan environment uji serta dokumentasi cara menjalankan backend.
-6. Integrasikan frontend melalui repository adapter, lalu jalankan skenario penerimaan end-to-end.
+---
+
+## Panduan Cepat Menjalankan Sistem
+
+1. **Jalankan Database PostgreSQL**:
+   ```bash
+   npm run docker:db
+   ```
+2. **Migrasi & Seed Database Backend**:
+   ```bash
+   npm run backend:prisma:generate
+   npm --prefix backend run prisma:migrate
+   npm run backend:prisma:seed
+   ```
+3. **Jalankan Backend Dev Server (Port 4000)**:
+   ```bash
+   npm run backend:dev
+   ```
+4. **Jalankan Frontend Dev Server (Port 3000)**:
+   ```bash
+   npm run dev
+   ```
+5. **Jalankan Seluruh Test Otomatis**:
+   ```bash
+   npm test               # 40 Frontend Tests (Vitest)
+   npm run backend:test   # 36 Backend Tests (Jest)
+   ```

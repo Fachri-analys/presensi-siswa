@@ -1,27 +1,28 @@
 # Sistem Presensi Siswa — SMK Negeri 11 Jakarta
 
-Dokumen ini adalah acuan fitur, perilaku, batasan, dan pekerjaan integrasi untuk frontend Sistem Presensi Siswa. Aplikasi yang ada sekarang adalah **frontend tahap awal**. Saat backend sekolah disambungkan, aplikasi harus menggunakan akun, data, dan hak akses dari backend; mekanisme simulasi tidak boleh menjadi sumber data produksi.
+Aplikasi Sistem Presensi Siswa monorepo (Frontend Next.js + Backend NestJS + PostgreSQL + Prisma) untuk pencatatan dan monitoring kehadiran siswa secara real-time, akurat, dan terproteksi hak akses role-based (Ketua Kelas, Guru Piket, Admin).
 
 ## Dokumen produk dan handoff
 
-Dokumen yang dirancang khusus untuk menyepakati pekerjaan backend tersedia di [docs/README.md](./docs/README.md):
+Dokumen spesifikasi produk, sistem, dan integrasi backend tersedia di [docs/README.md](./docs/README.md):
 
 - [PRD](./docs/PRD.md) — tujuan produk, pengguna, fitur MVP, alur, dan aturan bisnis.
 - [SRS](./docs/SRS.md) — persyaratan sistem serta kriteria penerimaan yang dapat diuji.
-- [Usulan kontrak API](./docs/API-CONTRACT.md) — route, payload, respons, error, autentikasi, dan pertanyaan integrasi.
-- [Panduan handoff backend](./docs/BACKEND-HANDOFF.md) — pembagian kerja, keputusan yang sudah disepakati, dan checklist.
-
-Dokumen API masih draf, dan frontend tetap memakai data demo sampai adapter backend diimplementasikan. Sepakati keputusan terbuka bersama sebelum mengunci endpoint atau memulai integrasi.
+- [Kontrak API](./docs/API-CONTRACT.md) — route, payload, respons, error, autentikasi, dan aturan integrasi.
+- [Panduan handoff backend](./docs/BACKEND-HANDOFF.md) — pembagian kerja, arsitektur backend, dan checklist integrasi.
 
 ## Struktur repository
 
 ```text
-app/                 Route dan halaman Next.js
-components/           Komponen UI
-lib/                  Domain, demo store, utilitas, dan fondasi API
-public/                Aset sekolah
-docs/                  PRD, SRS, usulan API, dan handoff backend
-CONTRIBUTING.md        Alur kontribusi dan validasi perubahan
+app/                 Route dan halaman Next.js (App Router)
+components/          Komponen UI dan modal aplikasi
+lib/                 Domain types, demo store, dan adapter API layer
+backend/             Backend API NestJS 10, Prisma 5, PostgreSQL schema, Docker
+public/              Aset statis sekolah
+docs/                PRD, SRS, kontrak API, dan handoff backend
+tests/               Unit & integration tests frontend (Vitest)
+.github/workflows/   CI/CD pipeline multi-job (Frontend & Backend)
+CONTRIBUTING.md      Alur kontribusi dan validasi perubahan
 ```
 
 Panduan branch, commit, pull request, validasi, dan aturan kontribusi ada di [CONTRIBUTING.md](./CONTRIBUTING.md).
@@ -45,21 +46,30 @@ Panduan branch, commit, pull request, validasi, dan aturan kontribusi ada di [CO
 
 ### Kebutuhan
 
-- Node.js yang mendukung Next.js 16.
-- npm.
+- Node.js >= 20.9.
+- npm >= 10.
+- Docker Desktop (opsional, untuk database PostgreSQL lokal).
 
-### Perintah
+### Perintah Utama
 
-```bash
-npm install
-npm run dev
-```
-
-Buka `http://localhost:3000`.
+| Perintah | Deskripsi |
+|---|---|
+| `npm run dev` | Menjalankan frontend Next.js pada `http://localhost:3000` |
+| `npm run backend:dev` | Menjalankan backend NestJS API pada `http://localhost:4000` |
+| `npm test` | Menjalankan unit & integration test frontend (Vitest, 40 tests) |
+| `npm run backend:test` | Menjalankan unit test backend (Jest, 36 tests) |
+| `npm run lint` | Menjalankan ESLint pada kode frontend |
+| `npm run typecheck` | Memeriksa tipe TypeScript frontend (`tsc --noEmit`) |
+| `npm run build` | Build produksi frontend Next.js |
+| `npm run backend:build` | Build produksi backend NestJS |
+| `npm run docker:db` | Menjalankan container database PostgreSQL via Docker Compose |
+| `npm run docker:db:down` | Menghentikan container database PostgreSQL |
+| `npm run backend:prisma:generate` | Menghasilkan client Prisma ORM untuk backend |
+| `npm run backend:prisma:seed` | Menjalankan seeding data awal ke database backend |
 
 ### Akun demo lokal
 
-Pada halaman masuk, role ditentukan dari kredensial akun; tidak ada pemilih role. Gunakan salah satu akun berikut untuk mencoba tampilan setiap peran:
+Pada halaman masuk (`/login`), role ditentukan dari kredensial akun:
 
 | Peran | Email | Password |
 |---|---|---|
@@ -67,34 +77,29 @@ Pada halaman masuk, role ditentukan dari kredensial akun; tidak ada pemilih role
 | Guru Piket | `piket.senin@smkn11jakarta.sch.id` | `demo-guru-2026` |
 | Admin | `admin@smkn11jakarta.sch.id` | `demo-admin-2026` |
 
-Kredensial ini tertanam di frontend dan hanya untuk simulasi lokal—bukan rahasia maupun autentikasi produksi. Backend produksi harus memverifikasi password, menentukan role dari akun tersimpan di server, dan menolak akses yang tidak sesuai; jangan gunakan password demo tersebut untuk akun sekolah.
+Kredensial demo ini terhubung dengan layer otentikasi API backend (dengan fallback aman saat koneksi offline untuk pengujian antarmuka).
 
-Contoh konfigurasi alamat backend ada di `.env.example`. Untuk uji lokal, salin menjadi `.env.local` lalu ubah URL sesuai server API. File `.env.local` tidak boleh dimasukkan ke Git. Konfigurasi ini baru menyiapkan alamat; UI demo **belum** mengirim permintaan ke backend.
-
+Contoh konfigurasi alamat backend ada di `.env.example`. Untuk menghubungkan frontend dengan backend, salin menjadi `.env.local`:
 ```bash
-npm run lint
-npm run build
-npm start
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1/
 ```
 
-`npm start` menjalankan hasil build produksi. Jalankan `npm run lint`, `npm run typecheck`, `npm test`, dan `npm run build` sebelum perubahan digabung. Pengujian otomatis meliputi helper statistik/rekap, decoder data, serta guard URL API; pengujian manual seluruh alur, browser, dan backend yang terhubung tetap diperlukan sebelum rilis.
+### CI/CD Pipeline
 
-Header keamanan dasar sudah aktif. Content Security Policy (CSP) yang ketat belum diterapkan karena integrasinya perlu mempertimbangkan nonce untuk skrip Next.js.
+Proyek ini dilengkapi automasi CI/CD pada `.github/workflows/ci.yml` yang berjalan otomatis pada setiap `push` dan `pull_request`:
+- **Job Frontend**: Validasi `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` (40 tests), `npm run build`, dan `npm audit`.
+- **Job Backend**: Validasi `npm ci`, `npx prisma generate`, `npm run lint`, `npm run typecheck`, `npm test` (36 tests), dan `npm run build`.
 
-Vitest ditingkatkan ke lini 4.1.11 agar memakai `@vitest/mocker` yang telah diperbaiki dan tetap mendukung Node.js 20.9+. Untuk `braces`, belum ada rilis npm yang memperbaiki CVE-2026-93687; dependency dev dipatok ke commit perbaikan yang telah ditinjau pada [PR upstream](https://github.com/micromatch/braces/pull/72). Perbarui override ke rilis resmi setelah tersedia. `npm audit` masih dapat menandai `braces@3.0.3` berdasarkan versi metadata commit tersebut meskipun kode guard nesting sudah terpasang; ini bukan klaim bahwa seluruh audit dependency bersih.
+### Status Pengujian Otomatis
 
-Pemeriksaan terakhir pada 3 Oktober 2026: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` (5 file, 13 tes), dan `npm run build` lulus. Uji regresi dependency memastikan `braces` menolak nesting lebih dari 100 tingkat. Walkthrough browser pada Edge lulus untuk Ketua Kelas (login, tambah/hapus presensi, riwayat, banner laporan contoh, ekspor contoh dinonaktifkan, logout), Guru Piket (login, simpan/hapus presensi, riwayat tersimpan, unduh Excel, logout), dan Admin (login, dashboard/pengaturan akun, simpan/kosongkan presensi, riwayat, laporan, logout). Halaman login melalui HTTP pada alamat jaringan lokal merespons 200; header `nosniff`, `strict-origin-when-cross-origin`, pembatasan kamera/mikrofon/geolokasi, dan `DENY` terverifikasi. Browser tidak mencatat error konsol atau error halaman pada alur tersebut.
-
-`npm audit --omit=dev` melaporkan 0 kerentanan. Audit seluruh dependency masih melaporkan 5 high pada rantai `eslint-config-next` → `fast-glob` → `micromatch` → `braces`. Kode `braces` dipatok ke commit perbaikan upstream, tetapi metadata paket commit masih bernomor `3.0.3` sehingga npm audit tetap mencocokkannya dengan advisory. Belum ada rilis npm resmi yang diperbaiki; ganti override dengan rilis resmi begitu tersedia. Tidak menurunkan `eslint-config-next` ke versi 14 karena itu perubahan mayor yang tidak cocok dengan Next.js 16.
+Total **76 test otomatis** berstatus **PASS (100%)**:
+- **Vitest (Frontend)**: 13 test suites, 40 tests passed.
+- **Jest (Backend)**: 10 test suites, 36 tests passed.
 
 ### Teknologi utama
 
-- Next.js 16 App Router
-- React 19 dan TypeScript
-- Tailwind CSS 4
-- ExcelJS untuk workbook Excel
-- Lucide React untuk ikon
-- Inter Variable untuk tipografi
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4, Vitest, Lucide React, ExcelJS.
+- **Backend**: NestJS 10, Prisma ORM 5, PostgreSQL 16, TypeScript 5, Jest, Docker Compose, Helmet, Bcrypt.
 
 ## Tujuan dan istilah
 

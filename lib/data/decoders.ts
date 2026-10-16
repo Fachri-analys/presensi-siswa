@@ -30,7 +30,7 @@ function text(value: unknown, path: string): string {
 }
 
 function optionalText(value: unknown, path: string): string | null {
-  if (value === null) return null;
+  if (value === null || value === undefined) return null;
   return text(value, path);
 }
 

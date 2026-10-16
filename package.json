@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint app components lib tests",
     "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "test": "vitest run",
     "backend:dev": "npm --prefix backend run start:dev",
