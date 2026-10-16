@@ -4,9 +4,9 @@ services:
     container_name: presensi-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: presensi
-      POSTGRES_PASSWORD: presensi_dev_password
-      POSTGRES_DB: presensi_dev
+      POSTGRES_USER: ${POSTGRES_USER:-presensi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-presensi_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-presensi_dev}
       TZ: Asia/Jakarta
       PGTZ: Asia/Jakarta
     ports:

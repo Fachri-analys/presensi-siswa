@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { btn, card, EmptyState, field } from "@/components/ui";
@@ -12,6 +12,8 @@ import { OWN_CLASS_ID } from "@/lib/mock";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceRecap, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { SemesterAttendanceStats } from "@/components/semester-attendance-stats";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import type { AttendanceReport } from "@/lib/data/contracts";
 
 const classes = getClasses();
 const jurusanList = [...new Set(classes.map((c) => c.jurusan))];
@@ -35,6 +37,7 @@ export default function LaporanPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const [activeTab, setActiveTab] = useState<"periode" | "semester">("periode");
+  const [apiReport, setApiReport] = useState<AttendanceReport | null>(null);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const demoStudents = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
 
@@ -43,13 +46,35 @@ export default function LaporanPage() {
   const kelas = options.find((c) => c.id === kelasId) ?? options[0];
   const days = workDays(from, to);
   const invalidDateRange = !isValidDateRange(from, to);
+
+  useEffect(() => {
+    let active = true;
+    async function loadReport() {
+      const repo = createApiAttendanceRepository();
+      if (!repo || !kelas?.id || !from || !to || invalidDateRange) {
+        if (active) setApiReport(null);
+        return;
+      }
+      try {
+        const report = await repo.getReport({ kelasId: kelas.id, from, to, status: status || undefined });
+        if (active) setApiReport(report);
+      } catch {
+        if (active) setApiReport(null);
+      }
+    }
+    void loadReport();
+    return () => {
+      active = false;
+    };
+  }, [kelas?.id, from, to, status, invalidDateRange]);
+
   const storedRecap = getStoredAttendanceRecap(attendanceStore, kelas.id, from, to, demoStudents);
-  const isExampleData = storedRecap === null;
-  const reportDays = storedRecap?.days ?? days;
-  const rows = (storedRecap?.rows ?? getRecap(kelas.id, days)).filter((r) => !status || r[STATUS_KEY[status]] > 0);
+  const isExampleData = !apiReport && storedRecap === null;
+  const reportDays = apiReport?.effectiveDays ?? storedRecap?.days ?? days;
+  const rows = (apiReport?.rows ?? storedRecap?.rows ?? getRecap(kelas.id, days)).filter((r) => !status || r[STATUS_KEY[status]] > 0);
   const total = (key: CountKey) => rows.reduce((sum, r) => sum + r[key], 0);
   const overall = pct(total("hadir"), reportDays * rows.length);
-  const daysLabel = storedRecap ? "hari presensi tercatat" : "hari kerja";
+  const daysLabel = apiReport || storedRecap ? "hari presensi tercatat" : "hari kerja";
   const ready = days > 0 && rows.length > 0;
   const th = "border border-line px-2 py-2 text-center";
   const td = "border border-line px-2 py-2 text-center";

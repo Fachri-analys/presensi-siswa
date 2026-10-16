@@ -10,6 +10,7 @@ import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { btn, card, EmptyState, field, StatCard } from "@/components/ui";
 import { useAttendanceWindow } from "@/components/use-attendance-window";
 import { useRole } from "@/components/app-shell";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
 const classes = getClasses();
@@ -95,6 +96,29 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
       setMessage("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;
     }
+
+    const attendanceRepo = createApiAttendanceRepository();
+    if (attendanceRepo) {
+      const records = Object.entries(attendance)
+        .filter(([, v]) => v && v.status)
+        .map(([nis, v]) => ({
+          nis,
+          status: v.status as "HADIR" | "TERLAMBAT" | "IZIN" | "SAKIT" | "ALPA",
+          waktu: v.waktu,
+          keterangan: v.keterangan || "",
+        }));
+
+      if (records.length > 0) {
+        attendanceRepo
+          .saveClassAttendance({
+            date,
+            kelasId: classId,
+            records,
+          })
+          .catch((err) => console.warn("Sync saveClassAttendance error:", err));
+      }
+    }
+
     setDraft(null);
     const approvals = students.filter((student) => attendance[student.nis]?.izinHadir).length;
     const actor = role === "ADMIN" ? "Admin" : "Guru Piket";

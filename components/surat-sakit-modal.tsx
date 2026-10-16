@@ -19,6 +19,8 @@ import { getClasses, OWN_CLASS_ID } from "@/lib/mock";
 import { getLocalDateKey, saveDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
 import { useRole } from "./app-shell";
+import { getApiBaseUrl } from "@/lib/data/api-client";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 
 interface SuratSakitModalProps {
   open: boolean;
@@ -174,13 +176,53 @@ export function SuratSakitModal({
     setStatus("loading");
 
     try {
-      // Simulasi upload berkas ke server
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const targetStudent = students.find((s) => s.nis === nis);
       const studentClass = classes.find((c) => c.id === targetStudent?.kelasId);
       const studentName = targetStudent?.nama ?? nis;
       const studentClassId = targetStudent?.kelasId ?? activeClassId;
+
+      const baseUrl = getApiBaseUrl();
+      if (baseUrl) {
+        const formData = new FormData();
+        formData.append("file", selectedFile!);
+        formData.append("date", tanggal);
+        formData.append("kelasId", studentClassId);
+        formData.append("studentId", targetStudent?.id ?? nis);
+        formData.append("keterangan", keterangan.trim());
+
+        const uploadUrl = new URL("sick-letters/upload", baseUrl);
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          const errText = errData?.message || `Gagal mengunggah berkas (${res.status}).`;
+          throw new Error(errText);
+        }
+
+        const attendanceRepo = createApiAttendanceRepository();
+        if (attendanceRepo) {
+          await attendanceRepo
+            .saveClassAttendance({
+              date: tanggal,
+              kelasId: studentClassId,
+              records: [
+                {
+                  nis,
+                  status: "SAKIT",
+                  waktu: null,
+                  keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
+                },
+              ],
+            })
+            .catch((err) => {
+              console.warn("Gagal sinkronisasi presensi ke server:", err);
+            });
+        }
+      }
 
       // Update data presensi demo agar status siswa tersimpan sebagai SAKIT
       const currentAttendance = attendanceStore[`${tanggal}::${studentClassId}`] ?? {};
@@ -195,7 +237,7 @@ export function SuratSakitModal({
       };
 
       const saved = saveDemoAttendance(studentClassId, tanggal, updatedAttendance);
-      if (!saved) {
+      if (!saved && !baseUrl) {
         throw new Error("Penyimpanan presensi lokal gagal.");
       }
 
@@ -216,9 +258,10 @@ export function SuratSakitModal({
       });
 
       setStatus("success");
-    } catch {
+    } catch (err: unknown) {
       setStatus("error");
-      setErrorMessage("Gagal mengunggah surat sakit. Terjadi gangguan pada koneksi data. Silakan coba lagi.");
+      const message = err instanceof Error ? err.message : "Gagal mengunggah surat sakit. Terjadi gangguan koneksi.";
+      setErrorMessage(message);
     }
   }
 

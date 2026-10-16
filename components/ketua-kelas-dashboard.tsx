@@ -13,6 +13,7 @@ import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
 import { btn, field, StatCard, StatusBadge } from "./ui";
 import { useAttendanceWindow } from "./use-attendance-window";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
 // Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
@@ -158,6 +159,25 @@ export function KetuaKelasDashboard() {
       setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;
     }
+
+    const attendanceRepo = createApiAttendanceRepository();
+    if (attendanceRepo) {
+      attendanceRepo
+        .saveClassAttendance({
+          date,
+          kelasId: OWN_CLASS_ID,
+          records: [
+            {
+              nis,
+              status,
+              waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null,
+              keterangan,
+            },
+          ],
+        })
+        .catch((err) => console.warn("Sync saveClassAttendance error:", err));
+    }
+
     addDemoActivity("Presensi siswa diperbarui", `Ketua Kelas mengubah presensi ${target?.nama ?? nis} di kelas ${kelas?.nama}.`);
     close();
     setToast("Presensi disimpan");

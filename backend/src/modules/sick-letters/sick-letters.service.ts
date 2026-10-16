@@ -63,11 +63,14 @@ export class SickLettersService {
       throw new ForbiddenException('Akses ditolak: Anda tidak memiliki akses ke kelas ini.');
     }
 
-    // Validasi siswa ada di kelas yang bersangkutan
-    const student = await this.prisma.student.findUnique({
-      where: { id: dto.studentId },
+    // Validasi siswa ada di kelas yang bersangkutan (dukung ID maupun NIS)
+    const student = await this.prisma.student.findFirst({
+      where: {
+        kelasId: dto.kelasId,
+        OR: [{ id: dto.studentId }, { nis: dto.studentId }],
+      },
     });
-    if (!student || student.kelasId !== dto.kelasId) {
+    if (!student) {
       throw new NotFoundException('Siswa tidak ditemukan pada kelas tersebut.');
     }
 
@@ -87,7 +90,7 @@ export class SickLettersService {
       data: {
         date: new Date(Date.UTC(recordDate.getUTCFullYear(), recordDate.getUTCMonth(), recordDate.getUTCDate())),
         kelasId: dto.kelasId,
-        studentId: dto.studentId,
+        studentId: student.id,
         keterangan: dto.keterangan,
         fileName: randomName,
         filePath: destinationPath,

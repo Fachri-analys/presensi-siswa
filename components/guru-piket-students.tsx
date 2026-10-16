@@ -6,6 +6,7 @@ import { addDemoActivity } from "@/lib/activity-log";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents, updateDemoStudents, type DemoStudent } from "@/lib/demo-students";
 import { getClasses } from "@/lib/mock";
 import { useRole } from "@/components/app-shell";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
 import { Dialog } from "./dialog";
 import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 
@@ -62,13 +63,21 @@ export function GuruPiketStudents({
       return;
     }
     const { student, kind } = pending;
+    const schoolRepo = createApiSchoolRepository();
+
     if (kind === "delete") {
       updateDemoStudents((previous) => previous.filter((item) => item.id !== student.id));
+      if (schoolRepo) {
+        schoolRepo.deleteStudent(student.id).catch((err) => console.warn("Sync delete student error:", err));
+      }
       addDemoActivity("Data siswa dihapus", `Admin menghapus data ${student.nama} (${student.nis}) dari daftar siswa.`);
       setToast(`Data ${student.nama} berhasil dihapus.`);
     } else {
       const nextStatus: StudentStatus = kind === "deactivate" ? "inactive" : "active";
       updateDemoStudents((previous) => previous.map((item) => item.id === student.id ? { ...item, status: nextStatus } : item));
+      if (schoolRepo) {
+        schoolRepo.setStudentActive(student.id, nextStatus === "active").catch((err) => console.warn("Sync status student error:", err));
+      }
       addDemoActivity(
         nextStatus === "inactive" ? "Data siswa dinonaktifkan" : "Data siswa diaktifkan kembali",
         `Admin mengubah data ${student.nama} (${student.nis}) menjadi ${nextStatus === "inactive" ? "nonaktif sehingga tidak masuk daftar presensi aktif" : "aktif kembali"}.`
@@ -103,15 +112,24 @@ export function GuruPiketStudents({
       setFormError("Nama siswa dan kelas wajib diisi dengan benar.");
       return;
     }
+
+    const schoolRepo = createApiSchoolRepository();
+
     if (editing) {
       updateDemoStudents((previous) => previous.map((student) =>
         student.id === editing.id ? { ...student, nis, nama, kelasId } : student
       ));
+      if (schoolRepo) {
+        schoolRepo.updateStudent(editing.id, { nis, nama, kelasId }).catch((err) => console.warn("Sync update student error:", err));
+      }
       addDemoActivity("Data siswa diperbarui", `Admin memperbarui data ${nama} (${nis}).`);
       setToast(`Data ${nama} berhasil diperbarui.`);
     } else {
       const newStudent: ManagedStudent = { id: `s-${nis}`, nis, nama, kelasId, status: "active" };
       updateDemoStudents((previous) => [newStudent, ...previous]);
+      if (schoolRepo) {
+        schoolRepo.createStudent({ nis, nama, kelasId }).catch((err) => console.warn("Sync create student error:", err));
+      }
       addDemoActivity("Data siswa ditambahkan", `Admin menambahkan ${nama} (${nis}) ke kelas ${className(kelasId)}.`);
       setToast(`Data ${nama} berhasil ditambahkan.`);
     }

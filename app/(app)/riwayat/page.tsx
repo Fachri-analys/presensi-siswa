@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
@@ -10,6 +10,8 @@ import { getClasses, getHistory, getClass, OWN_CLASS_ID } from "@/lib/mock";
 import { currentMonthRange, isValidDateRange, pct } from "@/lib/stats";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceHistory, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import type { HistoryRow } from "@/lib/data/contracts";
 
 const PAGE_SIZE = 10;
 const CELL = "px-4 py-3";
@@ -27,13 +29,36 @@ function RiwayatContent() {
   const [to, setTo] = useState(period.to);
   const invalidDateRange = !isValidDateRange(from, to);
   const [page, setPage] = useState(1);
+  const [apiHistory, setApiHistory] = useState<HistoryRow[] | null>(null);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
 
   // Ketua Kelas dikunci ke kelasnya; Guru Piket bebas memilih.
   const activeId = role === "KETUA_KELAS" ? OWN_CLASS_ID : kelasId;
   const kelas = getClass(activeId);
-  const storedRows = getStoredAttendanceHistory(attendanceStore, activeId, from, to);
+
+  useEffect(() => {
+    let active = true;
+    async function loadHistory() {
+      const repo = createApiAttendanceRepository();
+      if (!repo || !activeId || !from || !to || invalidDateRange) {
+        if (active) setApiHistory(null);
+        return;
+      }
+      try {
+        const history = await repo.getHistory({ kelasId: activeId, from, to });
+        if (active) setApiHistory(history);
+      } catch {
+        if (active) setApiHistory(null);
+      }
+    }
+    void loadHistory();
+    return () => {
+      active = false;
+    };
+  }, [activeId, from, to, invalidDateRange]);
+
+  const storedRows = apiHistory ?? getStoredAttendanceHistory(attendanceStore, activeId, from, to);
   const activeStudentCount = storedRows.length
     ? students.filter((student) => student.kelasId === activeId && student.status === "active").length
     : kelas?.siswa ?? 0;

@@ -5,6 +5,7 @@ import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2 } from "lucide-rea
 import { addDemoActivity } from "@/lib/activity-log";
 import { createId } from "@/lib/id";
 import { getDemoTeachers, getDemoTeachersServerSnapshot, subscribeToDemoTeachers, updateDemoTeachers, type DemoTeacher } from "@/lib/demo-teachers";
+import { createApiAdminRepository } from "@/lib/data/api-admin";
 import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 import { Dialog } from "./dialog";
 
@@ -45,12 +46,19 @@ export function AdminTeachers() {
       return;
     }
 
+    const adminRepo = createApiAdminRepository();
     if (editing) {
       updateDemoTeachers((previous) => previous.map((teacher) => teacher.id === editing.id ? { ...teacher, nip, nama } : teacher));
+      if (adminRepo) {
+        adminRepo.updateTeacher(editing.id, { nip, nama }).catch((err) => console.warn("Sync update teacher error:", err));
+      }
       addDemoActivity("Data guru diperbarui", `Admin memperbarui data ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil diperbarui.`);
     } else {
       updateDemoTeachers((previous) => [{ id: `g-${createId()}`, nip, nama, status: "active" }, ...previous]);
+      if (adminRepo) {
+        adminRepo.createTeacher({ nip, nama }).catch((err) => console.warn("Sync create teacher error:", err));
+      }
       addDemoActivity("Data guru ditambahkan", `Admin menambahkan ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil ditambahkan.`);
     }
@@ -60,6 +68,10 @@ export function AdminTeachers() {
 
   function deleteTeacher(teacher: DemoTeacher) {
     updateDemoTeachers((previous) => previous.filter((item) => item.id !== teacher.id));
+    const adminRepo = createApiAdminRepository();
+    if (adminRepo) {
+      adminRepo.deleteTeacher(teacher.id).catch((err) => console.warn("Sync delete teacher error:", err));
+    }
     addDemoActivity("Data guru dihapus", `Admin menghapus data ${teacher.nama} (NIP ${teacher.nip}).`);
     setMessage(`Data ${teacher.nama} berhasil dihapus.`);
     closeDialog();
@@ -68,6 +80,10 @@ export function AdminTeachers() {
   function toggleTeacherStatus(teacher: DemoTeacher) {
     const status = teacher.status === "active" ? "inactive" : "active";
     updateDemoTeachers((previous) => previous.map((item) => item.id === teacher.id ? { ...item, status } : item));
+    const adminRepo = createApiAdminRepository();
+    if (adminRepo) {
+      adminRepo.setTeacherActive(teacher.id, status === "active").catch((err) => console.warn("Sync status teacher error:", err));
+    }
     addDemoActivity(status === "inactive" ? "Data guru dinonaktifkan" : "Data guru diaktifkan kembali", `Admin mengubah data ${teacher.nama} (NIP ${teacher.nip}) menjadi ${status === "inactive" ? "nonaktif" : "aktif kembali"}.`);
     setMessage(`${teacher.nama} ${status === "inactive" ? "dinonaktifkan" : "diaktifkan kembali"}.`);
     closeDialog();

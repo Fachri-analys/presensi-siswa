@@ -19,7 +19,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
   beforeEach(async () => {
     mockPrisma = {
       student: {
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       sickLetter: {
         create: jest.fn(),
@@ -103,7 +103,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
       buffer: Buffer.from('valid png'),
     };
 
-    mockPrisma.student.findUnique.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
+    mockPrisma.student.findFirst.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
     mockPrisma.sickLetter.create.mockImplementation((args: any) => Promise.resolve(args.data));
 
     const result = await service.uploadFile(

@@ -42,5 +42,5 @@ prisma/migrations/dev.db*
 Thumbs.db
 
 # Uploads (surat sakit)
-updloads/
+uploads/
 !uploads/.gitkeep

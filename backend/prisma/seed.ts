@@ -1,5 +1,6 @@
 import { PrismaClient, Role, ActiveStatus, AttendanceSession } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -8,12 +9,15 @@ async function main() {
 
   const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
 
-  // ============================================================
-  // 1. Akun default (password untuk demo lokal)
-  // ============================================================
-  const adminPassword = await bcrypt.hash('Admin#2026', BCRYPT_ROUNDS);
-  const guruPassword = await bcrypt.hash('Guru#2026', BCRYPT_ROUNDS);
-  const ketuaPassword = await bcrypt.hash('Ketua#2026', BCRYPT_ROUNDS);
+  // Password wajib diambil dari environment variable lokal yang terlindungi,
+  // atau digenerate secara acak saat seed tanpa membocorkan ke source code.
+  const adminRaw = process.env.TEST_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+  const guruRaw = process.env.TEST_GURU_PASSWORD || crypto.randomBytes(16).toString('hex');
+  const ketuaRaw = process.env.TEST_KETUA_PASSWORD || crypto.randomBytes(16).toString('hex');
+
+  const adminPassword = await bcrypt.hash(adminRaw, BCRYPT_ROUNDS);
+  const guruPassword = await bcrypt.hash(guruRaw, BCRYPT_ROUNDS);
+  const ketuaPassword = await bcrypt.hash(ketuaRaw, BCRYPT_ROUNDS);
 
   // ============================================================
   // 2. Kelas
@@ -41,14 +45,14 @@ async function main() {
   console.log(`✅ Kelas: ${kelasX.nama}, ${kelasXI.nama}`);
 
   // ============================================================
-  // 3. Admin
+  // 3. Akun Admin Uji
   // ============================================================
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@smkn11jakarta.sch.id' },
-    update: {},
+    where: { email: 'admin.test@smkn11jakarta.sch.id' },
+    update: { passwordHash: adminPassword },
     create: {
-      email: 'admin@smkn11jakarta.sch.id',
-      nama: 'Admin Sekolah',
+      email: 'admin.test@smkn11jakarta.sch.id',
+      nama: 'Admin Uji Sistem',
       passwordHash: adminPassword,
       role: Role.ADMIN,
       status: ActiveStatus.active,
@@ -57,14 +61,14 @@ async function main() {
   });
 
   // ============================================================
-  // 4. Guru Piket
+  // 4. Akun Guru Piket Uji
   // ============================================================
   const guruPiket = await prisma.user.upsert({
-    where: { email: 'piket.senin@smkn11jakarta.sch.id' },
-    update: {},
+    where: { email: 'guru.test@smkn11jakarta.sch.id' },
+    update: { passwordHash: guruPassword },
     create: {
-      email: 'piket.senin@smkn11jakarta.sch.id',
-      nama: 'Guru Piket Senin',
+      email: 'guru.test@smkn11jakarta.sch.id',
+      nama: 'Guru Piket Uji',
       passwordHash: guruPassword,
       role: Role.GURU_PIKET,
       status: ActiveStatus.active,
@@ -73,14 +77,14 @@ async function main() {
   });
 
   // ============================================================
-  // 5. Ketua Kelas
+  // 5. Akun Ketua Kelas Uji (XI PPLG 1)
   // ============================================================
   const ketuaKelas = await prisma.user.upsert({
-    where: { email: 'aisyah.putri@smkn11jakarta.sch.id' },
-    update: {},
+    where: { email: 'ketua.test@smkn11jakarta.sch.id' },
+    update: { passwordHash: ketuaPassword, kelasId: kelasXI.id },
     create: {
-      email: 'aisyah.putri@smkn11jakarta.sch.id',
-      nama: 'Aisyah Putri',
+      email: 'ketua.test@smkn11jakarta.sch.id',
+      nama: 'Ketua Kelas Uji',
       passwordHash: ketuaPassword,
       role: Role.KETUA_KELAS,
       status: ActiveStatus.active,
@@ -88,7 +92,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ Akun: ${admin.email}, ${guruPiket.email}, ${ketuaKelas.email}`);
+  console.log(`✅ Akun Uji: ${admin.email}, ${guruPiket.email}, ${ketuaKelas.email}`);
 
   // ============================================================
   // 6. Teacher (data guru)
@@ -191,12 +195,9 @@ async function main() {
   console.log('✅ Jadwal: PAGI 07:00-12:00, SIANG 13:00-17:00');
 
   console.log('');
-  console.log('🎉 Seeding selesai!');
-  console.log('');
-  console.log('📋 Akun uji (password untuk demo lokal):');
-  console.log('   Admin       : admin@smkn11jakarta.sch.id / Admin#2026');
-  console.log('   Guru Piket  : piket.senin@smkn11jakarta.sch.id / Guru#2026');
-  console.log('   Ketua Kelas : aisyiyah.putri@smkn11jakarta.sch.id / Ketua#2026');
+  console.log('🎉 Seeding selesai dengan aman.');
+  console.log('📋 Akun uji telah disiapkan untuk role: ADMIN, GURU_PIKET, KETUA_KELAS.');
+  console.log('🔒 Kredensial disimpan secara terpisah pada file environment lokal.');
   console.log('');
 }
 
