@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation';
@@ -20,6 +21,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { RolesGuard } from './common/guards/roles.guard';
 
 @Module({
@@ -31,6 +33,12 @@ import { RolesGuard } from './common/guards/roles.guard';
       envFilePath: ['.env.local', '.env'],
       cache: true,
     }),
+    // Rate limiting: 3-tier throttle to protect against abuse
+    ThrottlerModule.forRoot([
+      { name: 'short', ttl: 1000, limit: 20 },
+      { name: 'medium', ttl: 60000, limit: 100 },
+      { name: 'long', ttl: 600000, limit: 500 },
+    ]),
     PrismaModule,
     HealthModule,
     AuthModule,
@@ -55,6 +63,14 @@ import { RolesGuard } from './common/guards/roles.guard';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TimeoutInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     {
       provide: APP_GUARD,

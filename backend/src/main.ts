@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import { AppModule } from './app.module';
+import { SessionCleanupService } from './common/services/session-cleanup.service';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -26,6 +28,9 @@ async function bootstrap() {
 
   // Cookie parser (untuk session cookie)
   app.use(cookieParser());
+
+  // Response compression (gzip/br) — skip responses < 1 KB
+  app.use(compression({ threshold: 1024 }));
 
   // CORS — whitelist origin frontend
   app.enableCors({
@@ -88,6 +93,10 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`Application running on http://localhost:${port}`);
   logger.log(`Environment: ${nodeEnv}`);
+
+  // Start periodic session cleanup (every 30 minutes)
+  const sessionCleanup = app.get(SessionCleanupService);
+  sessionCleanup.startPeriodicCleanup();
 }
 
 bootstrap().catch((err) => {
@@ -95,3 +104,4 @@ bootstrap().catch((err) => {
   console.error('Fatal error during bootstrap:', err);
   process.exit(1);
 });
+
