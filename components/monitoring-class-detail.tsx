@@ -6,13 +6,26 @@ import { RoleGate } from "@/components/role-gate";
 import { btn, StatCard } from "@/components/ui";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, subscribeToDemoAttendance } from "@/lib/demo-attendance";
-import { getClass, OWN_CLASS_ID } from "@/lib/mock";
+import { getClass } from "@/lib/mock";
 import { StudentTable } from "@/components/student-table";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
 
-export function MonitoringClassDetail({ classId }: { classId: string }) {
-  const { role } = useRole();
-  const kelas = getClass(classId);
+export function MonitoringClassDetail({ classId, initialClass }: { classId: string; initialClass?: { id: string; nama: string } }) {
+  const { role, kelasId: sessionClassId } = useRole();
+  const [apiClass, setApiClass] = useState<{ id: string; nama: string } | null>(initialClass ?? null);
+
+  useEffect(() => {
+    if (apiClass) return;
+    const schoolRepo = createApiSchoolRepository();
+    if (schoolRepo) {
+      schoolRepo.getClass(classId).then((c) => {
+        if (c) setApiClass(c);
+      }).catch(() => {});
+    }
+  }, [classId, apiClass]);
+
+  const kelas = apiClass ?? getClass(classId);
   const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const activeRoster = roster.filter((student) => student.kelasId === classId && student.status === "active");
@@ -35,7 +48,7 @@ export function MonitoringClassDetail({ classId }: { classId: string }) {
     alpa: students.filter((student) => student.status === "ALPA").length,
     terlambat: students.filter((student) => student.status === "TERLAMBAT").length,
   };
-  const allowedForRole = role !== "KETUA_KELAS" || classId === OWN_CLASS_ID;
+  const allowedForRole = role !== "KETUA_KELAS" || !sessionClassId || classId === sessionClassId;
 
   if (!kelas || !allowedForRole) {
     return (

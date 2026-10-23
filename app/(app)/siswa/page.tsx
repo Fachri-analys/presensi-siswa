@@ -5,10 +5,9 @@ import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { GuruPiketStudents } from "@/components/guru-piket-students";
 import { SemesterAttendanceStats } from "@/components/semester-attendance-stats";
-import { OWN_CLASS_ID } from "@/lib/mock";
 
 export default function SiswaPage() {
-  const { role } = useRole();
+  const { role, kelasId: sessionClassId } = useRole();
   const [activeTab, setActiveTab] = useState<"daftar" | "semester">("daftar");
 
   return (
@@ -47,11 +46,11 @@ export default function SiswaPage() {
         {activeTab === "daftar" ? (
           <GuruPiketStudents
             key={role}
-            fixedClassId={role === "KETUA_KELAS" ? OWN_CLASS_ID : undefined}
+            fixedClassId={role === "KETUA_KELAS" ? (sessionClassId ?? undefined) : undefined}
           />
         ) : (
           <SemesterAttendanceStats
-            initialClassId={role === "KETUA_KELAS" ? OWN_CLASS_ID : undefined}
+            initialClassId={role === "KETUA_KELAS" ? (sessionClassId ?? undefined) : undefined}
           />
         )}
       </div>

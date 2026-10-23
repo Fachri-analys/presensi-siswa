@@ -33,6 +33,17 @@ export function createApiSchoolRepository(fetcher?: typeof fetch): SchoolReposit
       );
     },
 
+    async getClass(id: string, signal?: AbortSignal): Promise<SchoolClass> {
+      return request(
+        `classes/${encodeURIComponent(id)}`,
+        {
+          method: "GET",
+          signal,
+        },
+        decodeClass,
+      );
+    },
+
     async createClass(input: CreateClassInput, signal?: AbortSignal): Promise<SchoolClass> {
       return request(
         "classes",

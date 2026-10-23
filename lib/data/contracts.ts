@@ -134,6 +134,7 @@ export interface AttendanceRepository {
 
 export interface SchoolRepository {
   listClasses(query?: PaginationQuery, signal?: AbortSignal): Promise<Page<SchoolClass>>;
+  getClass(id: string, signal?: AbortSignal): Promise<SchoolClass>;
   createClass(input: CreateClassInput, signal?: AbortSignal): Promise<SchoolClass>;
   updateClass(id: string, input: CreateClassInput, signal?: AbortSignal): Promise<SchoolClass>;
   assignClassLeader(kelasId: string, accountId: string | null, signal?: AbortSignal): Promise<SchoolClass>;

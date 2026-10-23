@@ -1,12 +1,66 @@
-import { MonitoringClassDetail } from "@/components/monitoring-class-detail";
-import { getClass } from "@/lib/mock";
-import { notFound } from "next/navigation";
+"use client";
 
-export default async function ClassDetailPage({ params }: { params: Promise<{ kelas: string }> }) {
-  const { kelas } = await params;
-  if (!getClass(kelas)) {
-    console.error("Halaman monitoring diminta untuk kelas yang tidak tersedia.", { kelas });
-    notFound();
+import { use, useEffect, useState } from "react";
+import { MonitoringClassDetail } from "@/components/monitoring-class-detail";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import type { SchoolClass } from "@/lib/data/contracts";
+import Link from "next/link";
+import { btn } from "@/components/ui";
+
+export default function ClassDetailPage({ params }: { params: Promise<{ kelas: string }> }) {
+  const { kelas } = use(params);
+  const [classData, setClassData] = useState<SchoolClass | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const schoolRepo = createApiSchoolRepository();
+    if (!schoolRepo) {
+      setLoading(false);
+      return;
+    }
+
+    schoolRepo
+      .getClass(kelas)
+      .then((data) => {
+        if (!active) return;
+        setClassData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.warn("Gagal memuat detail kelas dari API:", err);
+        setError("Kelas tidak ditemukan atau gagal dimuat dari server.");
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [kelas]);
+
+  if (loading) {
+    return (
+      <main className="p-6 text-center" role="status">
+        <p className="text-sm text-muted">Memuat data kelas...</p>
+      </main>
+    );
   }
-  return <MonitoringClassDetail classId={kelas} />;
+
+  if (error && !classData) {
+    return (
+      <main className="p-6 space-y-4">
+        <h1 className="text-xl font-semibold">Kelas Tidak Ditemukan</h1>
+        <p className="text-sm text-muted">{error}</p>
+        <div>
+          <Link href="/monitoring" className={btn.outline}>
+            Kembali ke monitoring
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  return <MonitoringClassDetail classId={kelas} initialClass={classData ?? undefined} />;
 }

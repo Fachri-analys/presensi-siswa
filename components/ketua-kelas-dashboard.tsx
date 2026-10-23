@@ -6,7 +6,8 @@ import { Eye, FilePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
-import { getAccountRows, getClass, OWN_CLASS_ID } from "@/lib/mock";
+import { getAccountRows, getClass } from "@/lib/mock";
+import { useRole } from "./app-shell";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { canMarkPresent } from "@/lib/demo-schedule";
 import { Dialog } from "./dialog";
@@ -102,15 +103,17 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
 }
 
 export function KetuaKelasDashboard() {
-  const kelas = getClass(OWN_CLASS_ID);
-  const ketuaName = getAccountRows().find((account) => account.role === "KETUA_KELAS" && account.kelasId === OWN_CLASS_ID)?.nama ?? "Ketua Kelas";
+  const { user, kelasId: sessionClassId } = useRole();
+  const kelasId = sessionClassId ?? "";
+  const kelas = getClass(kelasId) ?? (kelasId ? { id: kelasId, nama: `Kelas ${kelasId}` } : undefined);
+  const ketuaName = user?.nama ?? getAccountRows().find((account) => account.role === "KETUA_KELAS" && account.kelasId === kelasId)?.nama ?? "Ketua Kelas";
   const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const [date] = useState(getLocalDateKey);
   const { activeSession, ready } = useAttendanceWindow();
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
-  const savedAttendance = attendanceStore[`${date}::${OWN_CLASS_ID}`] ?? {};
+  const savedAttendance = attendanceStore[`${date}::${kelasId}`] ?? {};
   const students: Student[] = roster
-    .filter((student) => student.kelasId === OWN_CLASS_ID && student.status === "active")
+    .filter((student) => student.kelasId === kelasId && student.status === "active")
     .map((student) => {
       const saved = savedAttendance[student.nis];
       return {
@@ -155,7 +158,7 @@ export function KetuaKelasDashboard() {
       try {
         await attendanceRepo.saveClassAttendance({
           date,
-          kelasId: OWN_CLASS_ID,
+          kelasId: kelasId || "xi-pplg-1",
           records: [
             {
               nis,
@@ -178,12 +181,12 @@ export function KetuaKelasDashboard() {
       waktu,
       izinHadir: PRESENT.includes(status) ? false : previous?.izinHadir,
     };
-    if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
+    if (!saveDemoAttendance(kelasId || "xi-pplg-1", date, records)) {
       setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
       return;
     }
 
-    addDemoActivity("Presensi siswa diperbarui", `Ketua Kelas mengubah presensi ${target?.nama ?? nis} di kelas ${kelas?.nama}.`);
+    addDemoActivity("Presensi siswa diperbarui", `Ketua Kelas mengubah presensi ${target?.nama ?? nis} di kelas ${kelas?.nama ?? kelasId}.`);
     close();
     setToast("Presensi disimpan");
   }
@@ -202,11 +205,11 @@ export function KetuaKelasDashboard() {
 
     const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
     delete records[nis];
-    if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
+    if (!saveDemoAttendance(kelasId || "xi-pplg-1", date, records)) {
       setToast("Presensi belum berhasil dihapus. Coba lagi beberapa saat.");
       return;
     }
-    addDemoActivity("Presensi siswa dihapus", `Ketua Kelas menghapus presensi ${target?.nama ?? nis} di kelas ${kelas?.nama}.`);
+    addDemoActivity("Presensi siswa dihapus", `Ketua Kelas menghapus presensi ${target?.nama ?? nis} di kelas ${kelas?.nama ?? kelasId}.`);
     close();
     setToast("Presensi dihapus");
   }
@@ -324,7 +327,7 @@ export function KetuaKelasDashboard() {
       <SuratSakitModal
         open={suratSakitOpen}
         onClose={() => setSuratSakitOpen(false)}
-        initialClassId={OWN_CLASS_ID}
+        initialClassId={kelasId || undefined}
       />
     </div>
   );

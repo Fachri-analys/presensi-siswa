@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, Calendar } from "lucide-react";
-import { getClasses, OWN_CLASS_ID } from "@/lib/mock";
+import { getClasses } from "@/lib/mock";
 import {
   SEMESTER_OPTIONS,
   getSemesterStudentStats,
@@ -16,11 +16,11 @@ const PAGE_SIZE = 10;
 const CELL = "px-4 py-3";
 
 export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: string }) {
-  const { role } = useRole();
+  const { role, kelasId: sessionClassId } = useRole();
   const classes = getClasses();
   const isKetuaKelas = role === "KETUA_KELAS";
 
-  const defaultClassId = isKetuaKelas ? OWN_CLASS_ID : (initialClassId ?? "all");
+  const defaultClassId = isKetuaKelas ? (sessionClassId ?? "all") : (initialClassId ?? "all");
   const [selectedSemester, setSelectedSemester] = useState<string>(SEMESTER_OPTIONS[0].id);
   const [selectedClass, setSelectedClass] = useState<string>(defaultClassId);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -33,8 +33,8 @@ export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: s
 
   // Ambil data semester berdasarkan filter kelas
   const allStats = useMemo(() => {
-    return getSemesterStudentStats(selectedSemester, isKetuaKelas ? OWN_CLASS_ID : selectedClass);
-  }, [selectedSemester, selectedClass, isKetuaKelas]);
+    return getSemesterStudentStats(selectedSemester, isKetuaKelas ? (sessionClassId ?? selectedClass) : selectedClass);
+  }, [selectedSemester, selectedClass, isKetuaKelas, sessionClassId]);
 
   // Hitung summary sebelum filter search agar menggambarkan total keseluruhan kelas/semester
   const summary = useMemo(() => computeSemesterSummary(allStats), [allStats]);

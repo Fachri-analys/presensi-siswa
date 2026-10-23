@@ -15,7 +15,7 @@ import {
 import { Dialog } from "./dialog";
 import { btn, field } from "./ui";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getClasses, OWN_CLASS_ID } from "@/lib/mock";
+import { getClasses } from "@/lib/mock";
 import { getLocalDateKey, saveDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { addDemoActivity } from "@/lib/activity-log";
 import { useRole } from "./app-shell";
@@ -44,9 +44,9 @@ export function SuratSakitModal({
   initialClassId,
   initialNis,
 }: SuratSakitModalProps) {
-  const { role } = useRole();
+  const { role, kelasId: sessionClassId } = useRole();
   const isKetuaKelas = role === "KETUA_KELAS";
-  const activeClassId = isKetuaKelas ? OWN_CLASS_ID : (initialClassId ?? OWN_CLASS_ID);
+  const activeClassId = isKetuaKelas ? (sessionClassId ?? initialClassId) : (initialClassId ?? sessionClassId);
   const classes = getClasses();
   const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
@@ -179,7 +179,10 @@ export function SuratSakitModal({
       const targetStudent = students.find((s) => s.nis === nis);
       const studentClass = classes.find((c) => c.id === targetStudent?.kelasId);
       const studentName = targetStudent?.nama ?? nis;
-      const studentClassId = targetStudent?.kelasId ?? activeClassId;
+      const studentClassId = targetStudent?.kelasId ?? activeClassId ?? "";
+      if (!studentClassId) {
+        throw new Error("Kelas siswa tidak ditemukan.");
+      }
 
       const baseUrl = getApiBaseUrl();
       if (baseUrl) {

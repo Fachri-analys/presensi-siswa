@@ -8,7 +8,6 @@ import { getClasses, getRecap } from "@/lib/mock";
 import { currentMonthRange, isValidDateRange, pct, workDays } from "@/lib/stats";
 import { STATUS_LABEL, type Status } from "@/lib/types";
 import { useRole } from "@/components/app-shell";
-import { OWN_CLASS_ID } from "@/lib/mock";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceRecap, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { SemesterAttendanceStats } from "@/components/semester-attendance-stats";
@@ -26,7 +25,7 @@ function Filter({ label, children }: { label: string; children: React.ReactNode 
 }
 
 export default function LaporanPage() {
-  const { role } = useRole();
+  const { role, kelasId: sessionClassId } = useRole();
   const [period] = useState(currentMonthRange);
   const [jurusan, setJurusan] = useState("");
   const [kelasId, setKelasId] = useState(classes[0].id);
@@ -41,7 +40,7 @@ export default function LaporanPage() {
   const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
   const demoStudents = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
 
-  const visibleClasses = role === "KETUA_KELAS" ? classes.filter((c) => c.id === OWN_CLASS_ID) : classes;
+  const visibleClasses = role === "KETUA_KELAS" ? classes.filter((c) => sessionClassId ? c.id === sessionClassId : true) : classes;
   const options = visibleClasses.filter((c) => !jurusan || c.jurusan === jurusan);
   const kelas = options.find((c) => c.id === kelasId) ?? options[0];
   const days = workDays(from, to);

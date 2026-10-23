@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { btn, card, EmptyState, field, Pagination } from "@/components/ui";
-import { getClasses, getHistory, getClass, OWN_CLASS_ID } from "@/lib/mock";
+import { getClasses, getHistory, getClass } from "@/lib/mock";
 import { currentMonthRange, isValidDateRange, pct } from "@/lib/stats";
 import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceHistory, subscribeToDemoAttendance } from "@/lib/demo-attendance";
 import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
@@ -19,10 +19,11 @@ const classes = getClasses();
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 function RiwayatContent() {
-  const { role } = useRole();
+  const { role, kelasId: sessionClassId } = useRole();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("kelas");
-  const initialClassId = classes.some((kelas) => kelas.id === requestedClassId) ? requestedClassId! : OWN_CLASS_ID;
+  const defaultClassId = sessionClassId ?? classes[0]?.id ?? "xi-pplg-1";
+  const initialClassId = classes.some((kelas) => kelas.id === requestedClassId) ? requestedClassId! : defaultClassId;
   const [period] = useState(currentMonthRange);
   const [kelasId, setKelasId] = useState(initialClassId);
   const [from, setFrom] = useState(period.from);
@@ -34,7 +35,7 @@ function RiwayatContent() {
   const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
 
   // Ketua Kelas dikunci ke kelasnya; Guru Piket bebas memilih.
-  const activeId = role === "KETUA_KELAS" ? OWN_CLASS_ID : kelasId;
+  const activeId = role === "KETUA_KELAS" ? (sessionClassId ?? defaultClassId) : kelasId;
   const kelas = getClass(activeId);
 
   useEffect(() => {

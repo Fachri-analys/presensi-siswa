@@ -64,8 +64,6 @@ export function getRecap(classId: string, days: number): RecapRow[] {
   });
 }
 
-export const OWN_CLASS_ID = "xi-pplg-1";
-
 export const getStudentRows = (): StudentRow[] =>
   CLASSES.flatMap((c) => getStudents(c.id).map((s) => ({ id: `s-${s.nis}`, nis: s.nis, nama: s.nama, kelasId: c.id })));
 
@@ -76,7 +74,7 @@ export const getKelasRows = (): KelasRow[] =>
 export const getAccountRows = (): AccountRow[] => [
   { id: "a1", nama: "Admin Sekolah", email: "admin@smkn11jakarta.sch.id", role: "ADMIN", kelasId: "" },
   { id: "a2", nama: "Guru Piket Senin", email: "piket.senin@smkn11jakarta.sch.id", role: "GURU_PIKET", kelasId: "" },
-  { id: "a3", nama: "Aisyah Putri", email: "aisyah.putri@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: OWN_CLASS_ID },
+  { id: "a3", nama: "Aisyah Putri", email: "aisyah.putri@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: "xi-pplg-1" },
   { id: "a4", nama: "Rizky Ramadhan", email: "rizky.ramadhan@smkn11jakarta.sch.id", role: "KETUA_KELAS", kelasId: "xi-dkv-1" },
 ];
 
