@@ -43,6 +43,28 @@ jobs:
   backend:
     name: Backend (NestJS + Prisma)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: presensi
+          POSTGRES_PASSWORD: presensi_dev_password
+          POSTGRES_DB: presensi_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://presensi:presensi_dev_password@localhost:5432/presensi_dev?schema=public
+      SESSION_SECRET: e6b2c7e997f75e2fa41893dca6094392138ad3fe68a834279dfc82c65a88c7d1
+      CSRF_SECRET: a5f1d8c946e82f3ba70932dcb6095481239bd4ef79b945380efd93d76b99d8e2
+      PORT: 4000
+      TEST_ADMIN_PASSWORD: Admin#2026Password!
+      TEST_GURU_PASSWORD: Guru#2026Password!
+      TEST_KETUA_PASSWORD: Ketua#2026Password!
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,6 +84,14 @@ jobs:
         run: npx prisma generate
         working-directory: backend
 
+      - name: Run Prisma migrations
+        run: npx prisma migrate deploy
+        working-directory: backend
+
+      - name: Seed database
+        run: npm run prisma:seed
+        working-directory: backend
+
       - name: Lint backend
         run: npm run lint
         working-directory: backend
@@ -72,6 +102,10 @@ jobs:
 
       - name: Run backend unit tests
         run: npm test
+        working-directory: backend
+
+      - name: Run backend e2e tests
+        run: npm run test:e2e
         working-directory: backend
 
       - name: Build NestJS application

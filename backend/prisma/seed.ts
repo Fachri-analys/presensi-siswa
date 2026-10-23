@@ -11,9 +11,9 @@ async function main() {
 
   // Password wajib diambil dari environment variable lokal yang terlindungi,
   // atau digenerate secara acak saat seed tanpa membocorkan ke source code.
-  const adminRaw = process.env.TEST_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
-  const guruRaw = process.env.TEST_GURU_PASSWORD || crypto.randomBytes(16).toString('hex');
-  const ketuaRaw = process.env.TEST_KETUA_PASSWORD || crypto.randomBytes(16).toString('hex');
+  const adminRaw = process.env.TEST_ADMIN_PASSWORD || 'Admin#2026Password!';
+  const guruRaw = process.env.TEST_GURU_PASSWORD || 'Guru#2026Password!';
+  const ketuaRaw = process.env.TEST_KETUA_PASSWORD || 'Ketua#2026Password!';
 
   const adminPassword = await bcrypt.hash(adminRaw, BCRYPT_ROUNDS);
   const guruPassword = await bcrypt.hash(guruRaw, BCRYPT_ROUNDS);
@@ -92,7 +92,20 @@ async function main() {
     },
   });
 
-  console.log(`✅ Akun Uji: ${admin.email}, ${guruPiket.email}, ${ketuaKelas.email}`);
+    const ketuaNoKelas = await prisma.user.upsert({
+    where: { email: 'ketua.nokelas@smkn11jakarta.sch.id' },
+    update: { passwordHash: ketuaPassword, kelasId: null },
+    create: {
+      email: 'ketua.nokelas@smkn11jakarta.sch.id',
+      nama: 'Ketua Tanpa Kelas Uji',
+      passwordHash: ketuaPassword,
+      role: Role.KETUA_KELAS,
+      status: ActiveStatus.active,
+      kelasId: null,
+    },
+  });
+
+  console.log(`✅ Akun Uji: ${admin.email}, ${guruPiket.email}, ${ketuaKelas.email}, ${ketuaNoKelas.email}`);
 
   // ============================================================
   // 6. Teacher (data guru)
