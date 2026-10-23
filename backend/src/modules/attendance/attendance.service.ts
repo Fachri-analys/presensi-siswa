@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
-import { AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
+import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 
 @Injectable()
@@ -222,6 +222,7 @@ export class AttendanceService {
           entry.hadir += count;
           break;
         case AttendanceStatus.TERLAMBAT:
+          entry.hadir += count;
           entry.terlambat += count;
           break;
         case AttendanceStatus.IZIN:
@@ -246,6 +247,9 @@ export class AttendanceService {
 
     const kelas = await this.prisma.class.findUnique({
       where: { id: query.kelasId },
+      include: {
+        leader: { select: { id: true } },
+      },
     });
     if (!kelas) {
       throw new NotFoundException('Kelas tidak ditemukan.');
@@ -314,14 +318,14 @@ export class AttendanceService {
 
     const rows = students.map((st) => {
       const stat = studentStats.get(st.id) ?? { hadir: 0, izin: 0, sakit: 0, alpa: 0, terlambat: 0 };
-      const totalHadir = stat.hadir + stat.terlambat;
-      const persentase = effectiveDays > 0 ? Math.round((totalHadir / effectiveDays) * 100) : 0;
+      const hadir = stat.hadir + stat.terlambat;
+      const persentase = effectiveDays > 0 ? Math.round((hadir / effectiveDays) * 100) : 0;
 
       return {
         id: st.id,
         nis: st.nis,
         nama: st.nama,
-        hadir: stat.hadir,
+        hadir,
         terlambat: stat.terlambat,
         izin: stat.izin,
         sakit: stat.sakit,
@@ -330,12 +334,19 @@ export class AttendanceService {
       };
     });
 
+    const from = query.from ?? (distinctDates.length > 0 ? distinctDates[0].date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const to = query.to ?? (distinctDates.length > 0 ? distinctDates[distinctDates.length - 1].date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+
     return {
       kelas: {
         id: kelas.id,
         nama: kelas.nama,
         jurusan: kelas.jurusan,
+        active: kelas.status === ActiveStatus.active,
+        ketuaAkunId: kelas.leader?.id ?? null,
       },
+      from,
+      to,
       effectiveDays,
       rows,
     };

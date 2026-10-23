@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AttendanceService } from './attendance.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
-import { AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
+import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 
 describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
   let service: AttendanceService;
@@ -172,6 +172,8 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       id: 'cls-1',
       nama: 'XI PPLG 1',
       jurusan: 'PPLG',
+      status: ActiveStatus.active,
+      leader: null,
     });
 
     mockPrisma.student.findMany.mockResolvedValueOnce([
@@ -194,8 +196,11 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     const recap = await service.getRecap({ kelasId: 'cls-1' }, user);
     expect(recap.rows.length).toBe(2);
     expect(recap.effectiveDays).toBe(2);
-    expect(recap.rows[0].hadir).toBe(18);
+    expect(recap.rows[0].hadir).toBe(20); // 18 Hadir + 2 Terlambat
     expect(recap.rows[0].terlambat).toBe(2);
+    expect(recap.kelas.active).toBe(true);
+    expect(recap).toHaveProperty('from');
+    expect(recap).toHaveProperty('to');
 
     // Pastikan dipanggil menggunakan agregasi groupBy, bukan looping individual query
     expect(mockPrisma.attendance.groupBy).toHaveBeenCalledTimes(1);

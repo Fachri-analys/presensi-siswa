@@ -73,13 +73,15 @@ export class ClassesService {
       throw new ConflictException(`Kelas "${dto.nama}" sudah ada.`);
     }
 
-    return this.prisma.class.create({
+    const created = await this.prisma.class.create({
       data: {
         nama: dto.nama,
         jurusan: dto.jurusan,
         status: ActiveStatus.active,
       },
     });
+
+    return this.findOne(created.id);
   }
 
   async update(id: string, dto: UpdateClassDto) {
@@ -94,10 +96,12 @@ export class ClassesService {
       }
     }
 
-    return this.prisma.class.update({
+    await this.prisma.class.update({
       where: { id },
       data: dto,
     });
+
+    return this.findOne(id);
   }
 
   async assignLeader(kelasId: string, leaderUserId: string | null) {

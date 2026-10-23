@@ -51,4 +51,19 @@ describe('MonitoringService (Single Aggregation, N+1 Prevention)', () => {
     expect(mockPrisma.class.findMany).toHaveBeenCalledTimes(1);
     expect(mockPrisma.attendance.groupBy).toHaveBeenCalledTimes(1);
   });
+  it('[B5] getSummary() menghitung hadir = HADIR + TERLAMBAT dan terlambat sebagai rincian', async () => {
+    mockPrisma.class.findMany.mockResolvedValueOnce([
+      { id: 'cls-1', nama: 'XI PPLG 1', jurusan: 'PPLG', _count: { students: 30 } },
+    ]);
+    mockPrisma.attendance.groupBy.mockResolvedValueOnce([
+      { kelasId: 'cls-1', status: AttendanceStatus.HADIR, _count: { status: 25 } },
+      { kelasId: 'cls-1', status: AttendanceStatus.TERLAMBAT, _count: { status: 3 } },
+      { kelasId: 'cls-1', status: AttendanceStatus.ALPA, _count: { status: 2 } },
+    ]);
+
+    const result = await service.getSummary('2026-10-16');
+    expect(result[0].hadir).toBe(28); // 25 + 3
+    expect(result[0].terlambat).toBe(3);
+    expect(result[0].alpa).toBe(2);
+  });
 });

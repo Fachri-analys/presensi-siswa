@@ -36,7 +36,16 @@ describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
 
   // [CRUD-05] Tambah kelas baru berhasil
   it('[CRUD-05] create() berhasil membuat kelas baru dengan nama unik', async () => {
-    mockPrisma.class.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.class.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'cls-1',
+        nama: 'XI PPLG 1',
+        jurusan: 'PPLG',
+        status: ActiveStatus.active,
+        leader: null,
+        _count: { students: 0 },
+      });
     mockPrisma.class.create.mockResolvedValueOnce({
       id: 'cls-1',
       nama: 'XI PPLG 1',
@@ -50,6 +59,8 @@ describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
     });
 
     expect(result.nama).toBe('XI PPLG 1');
+    expect(result.active).toBe(true);
+    expect(result).toHaveProperty('ketuaAkunId');
     expect(mockPrisma.class.create).toHaveBeenCalled();
   });
 

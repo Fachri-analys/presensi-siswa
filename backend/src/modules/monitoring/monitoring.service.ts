@@ -65,6 +65,7 @@ export class MonitoringService {
           entry.hadir += count;
           break;
         case AttendanceStatus.TERLAMBAT:
+          entry.hadir += count;
           entry.terlambat += count;
           break;
         case AttendanceStatus.IZIN:
