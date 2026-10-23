@@ -43,3 +43,17 @@ export function parseDateOnly(dateStr: string): Date {
 
   return date;
 }
+
+const wibTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: WIB_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+/**
+ * Mengembalikan jam saat ini dalam format HH:MM sesuai zona waktu Asia/Jakarta (WIB).
+ */
+export function nowWibTime(now = new Date()): string {
+  return wibTimeFormatter.format(now);
+}

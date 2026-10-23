@@ -4,6 +4,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
 import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 
+// Default mock nowWibTime ke jam 08:00 (dalam window sesi PAGI default)
+const mockNowWibTime = jest.fn().mockReturnValue('08:00');
+jest.mock('../../common/utils/time.util', () => ({
+  ...jest.requireActual('../../common/utils/time.util'),
+  nowWibTime: (...args: any[]) => mockNowWibTime(...args),
+}));
+
 describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
   let service: AttendanceService;
   let mockPrisma: any;
@@ -140,10 +147,13 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       kelasId: 'cls-own',
     };
 
-    mockPrisma.schedule.findFirst.mockResolvedValueOnce({
-      session: AttendanceSession.PAGI,
-      terkunci: true, // Sesi terkunci
-    });
+    // Stub nowWibTime agar dalam window sesi (sehingga time-window check lolos,
+    // hanya terkunci yang diuji)
+    mockNowWibTime.mockReturnValue('08:00');
+
+    mockPrisma.schedule.findMany.mockResolvedValueOnce([
+      { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: true },
+    ]);
     mockPrisma.attendancePermission.findFirst.mockResolvedValueOnce(null); // Tidak ada izin
 
     await expect(
@@ -156,6 +166,169 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
         ketuaUser,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  // [B3-01] Ketua Kelas dilarang mencatat HADIR/TERLAMBAT di luar window sesi
+  it('[B3-01] saveBatch() menolak HADIR/TERLAMBAT dari Ketua Kelas di luar window sesi', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    // Jam saat ini di luar window (sesi PAGI 07:00-12:00, SIANG 13:00-15:00, sekarang 17:00)
+    mockNowWibTime.mockReturnValue('17:00');
+
+    mockPrisma.schedule.findMany.mockResolvedValueOnce([
+      { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: false },
+      { session: AttendanceSession.SIANG, mulai: '13:00', selesai: '15:00', terkunci: false },
+    ]);
+    mockPrisma.attendancePermission.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.saveBatch(
+        {
+          date: '2026-10-16',
+          kelasId: 'cls-own',
+          records: [{ nis: '241101', status: AttendanceStatus.HADIR }],
+        },
+        ketuaUser,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // [B3-02] Ketua Kelas boleh mencatat IZIN/SAKIT/ALPA di luar window sesi
+  it('[B3-02] saveBatch() mengizinkan IZIN/SAKIT/ALPA dari Ketua Kelas di luar window sesi', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    mockNowWibTime.mockReturnValue('17:00');
+
+    mockPrisma.schedule.findMany.mockResolvedValueOnce([
+      { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: false },
+    ]);
+
+    mockPrisma.student.findMany.mockResolvedValueOnce([
+      { id: 'std-1', nis: '241101' },
+    ]);
+
+    mockPrisma.attendance.upsert.mockResolvedValueOnce({
+      id: 'att-1',
+      kelasId: 'cls-own',
+      studentId: 'std-1',
+      status: AttendanceStatus.SAKIT,
+      waktu: null,
+      keterangan: 'Demam',
+      createdById: 'usr-ketua',
+      updatedById: 'usr-ketua',
+      updatedAt: new Date(),
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+
+    const result = await service.saveBatch(
+      {
+        date: '2026-10-16',
+        kelasId: 'cls-own',
+        records: [{ nis: '241101', status: AttendanceStatus.SAKIT, keterangan: 'Demam' }],
+      },
+      ketuaUser,
+    );
+
+    expect(result.length).toBe(1);
+    expect(result[0].status).toBe(AttendanceStatus.SAKIT);
+  });
+
+  // [B3-03] Ketua Kelas boleh mencatat HADIR dalam window sesi yang terbuka
+  it('[B3-03] saveBatch() mengizinkan HADIR dari Ketua Kelas dalam window sesi terbuka', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    mockNowWibTime.mockReturnValue('08:30');
+
+    mockPrisma.schedule.findMany.mockResolvedValueOnce([
+      { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: false },
+    ]);
+
+    mockPrisma.student.findMany.mockResolvedValueOnce([
+      { id: 'std-1', nis: '241101' },
+    ]);
+
+    mockPrisma.attendance.upsert.mockResolvedValueOnce({
+      id: 'att-1',
+      kelasId: 'cls-own',
+      studentId: 'std-1',
+      status: AttendanceStatus.HADIR,
+      waktu: '08:30',
+      keterangan: '',
+      createdById: 'usr-ketua',
+      updatedById: 'usr-ketua',
+      updatedAt: new Date(),
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+
+    const result = await service.saveBatch(
+      {
+        date: '2026-10-16',
+        kelasId: 'cls-own',
+        records: [{ nis: '241101', status: AttendanceStatus.HADIR, waktu: '08:30' }],
+      },
+      ketuaUser,
+    );
+
+    expect(result.length).toBe(1);
+    expect(result[0].status).toBe(AttendanceStatus.HADIR);
+  });
+
+  // [B3-04] Guru Piket/Admin tidak terikat batasan window sesi
+  it('[B3-04] saveBatch() mengizinkan HADIR dari Guru Piket meskipun di luar window sesi', async () => {
+    const guruUser = {
+      id: 'usr-guru',
+      email: 'guru@test.com',
+      nama: 'Guru Piket',
+      role: Role.GURU_PIKET,
+      kelasId: null,
+    };
+
+    // Tidak perlu mock schedule karena Guru Piket tidak dicek window-nya
+    mockPrisma.student.findMany.mockResolvedValueOnce([
+      { id: 'std-1', nis: '241101' },
+    ]);
+
+    mockPrisma.attendance.upsert.mockResolvedValueOnce({
+      id: 'att-1',
+      kelasId: 'cls-1',
+      studentId: 'std-1',
+      status: AttendanceStatus.HADIR,
+      waktu: '17:00',
+      keterangan: '',
+      createdById: 'usr-guru',
+      updatedById: 'usr-guru',
+      updatedAt: new Date(),
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+
+    const result = await service.saveBatch(
+      {
+        date: '2026-10-16',
+        kelasId: 'cls-1',
+        records: [{ nis: '241101', status: AttendanceStatus.HADIR, waktu: '17:00' }],
+      },
+      guruUser,
+    );
+
+    expect(result.length).toBe(1);
   });
 
   // [PERF-N1-03] Rekap semester menggunakan agregasi groupBy dalam query konstan

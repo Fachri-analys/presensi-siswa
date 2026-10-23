@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { todayWib, parseDateOnly } from './time.util';
+import { todayWib, parseDateOnly, nowWibTime } from './time.util';
 
 describe('TimeUtil - Zona Waktu WIB (B6)', () => {
   describe('todayWib', () => {
@@ -27,6 +27,20 @@ describe('TimeUtil - Zona Waktu WIB (B6)', () => {
       expect(() => parseDateOnly('24-10-2026')).toThrow(BadRequestException);
       expect(() => parseDateOnly('invalid-date')).toThrow(BadRequestException);
       expect(() => parseDateOnly('2026-02-31')).toThrow(BadRequestException);
+    });
+  });
+
+  describe('nowWibTime', () => {
+    it('[B6-05] mengembalikan jam WIB format HH:MM', () => {
+      // 2026-10-24 00:30 UTC = 2026-10-24 07:30 WIB
+      const morning = new Date('2026-10-24T00:30:00.000Z');
+      expect(nowWibTime(morning)).toBe('07:30');
+    });
+
+    it('[B6-06] mengembalikan jam WIB saat malam UTC (berikutnya di WIB)', () => {
+      // 2026-10-23 18:00 UTC = 2026-10-24 01:00 WIB
+      const lateUtc = new Date('2026-10-23T18:00:00.000Z');
+      expect(nowWibTime(lateUtc)).toBe('01:00');
     });
   });
 });

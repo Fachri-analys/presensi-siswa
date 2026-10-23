@@ -8,7 +8,7 @@ import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
 import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
-import { parseDateOnly } from '../../common/utils/time.util';
+import { parseDateOnly, nowWibTime } from '../../common/utils/time.util';
 
 @Injectable()
 export class AttendanceService {
@@ -26,24 +26,39 @@ export class AttendanceService {
 
     const attendanceDate = parseDateOnly(dto.date);
 
-    // 2. Periksa jadwal penguncian sesi jika bukan Admin / Guru Piket
+    // 2. Enforcement jadwal sesi untuk Ketua Kelas (B3: FR-ATT-12)
+    //    HADIR/TERLAMBAT hanya boleh dicatat dalam window sesi terbuka.
+    //    IZIN/SAKIT/ALPA selalu diizinkan.
     if (user.role === Role.KETUA_KELAS) {
-      const schedule = await this.prisma.schedule.findFirst({
-        where: { session: AttendanceSession.PAGI },
-      });
-      if (schedule?.terkunci) {
-        // Cek izin khusus (permission)
-        const permission = await this.prisma.attendancePermission.findFirst({
-          where: {
-            date: attendanceDate,
-            kelasId: dto.kelasId,
-            usedAt: null,
-          },
-        });
-        if (!permission) {
-          throw new ForbiddenException(
-            'Sesi presensi saat ini terkunci. Hubungi Guru Piket untuk membuka izin presensi.',
-          );
+      const hasPresent = dto.records.some(
+        (r) => r.status === AttendanceStatus.HADIR || r.status === AttendanceStatus.TERLAMBAT,
+      );
+
+      if (hasPresent) {
+        const schedules = await this.prisma.schedule.findMany();
+        const currentTime = nowWibTime();
+
+        // Cek apakah ada sesi yang window-nya terbuka dan tidak terkunci
+        const openSession = schedules.find(
+          (s) => !s.terkunci && currentTime >= s.mulai && currentTime <= s.selesai,
+        );
+
+        if (!openSession) {
+          // Cek izin khusus (permission) per kelas/tanggal
+          const permission = await this.prisma.attendancePermission.findFirst({
+            where: {
+              date: attendanceDate,
+              kelasId: dto.kelasId,
+              usedAt: null,
+            },
+          });
+          if (!permission) {
+            throw new ForbiddenException(
+              'Sesi presensi saat ini tidak aktif atau terkunci. ' +
+              'Ketua Kelas hanya dapat mencatat HADIR/TERLAMBAT dalam window sesi terbuka. ' +
+              'Hubungi Guru Piket untuk membuka izin presensi.',
+            );
+          }
         }
       }
     }
