@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StudentsController } from './students.controller';
 import { StudentsService } from './students.service';
-import { AuthService } from '../auth/auth.service';
 import { Role } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
 import type { SessionUser } from '../../common/types/session-user.type';
@@ -25,10 +24,6 @@ describe('StudentsController (Access Control - B2 & Blok 0)', () => {
         {
           provide: StudentsService,
           useValue: mockStudentsService,
-        },
-        {
-          provide: AuthService,
-          useValue: {},
         },
       ],
     }).compile();
@@ -75,10 +70,10 @@ describe('StudentsController (Access Control - B2 & Blok 0)', () => {
     });
 
     // Harus melempar ForbiddenException karena ketua kelas A mengakses siswa kelas B
-    await expect((controller as any).findOne('std-in-b', ketuaAUser)).rejects.toThrow(ForbiddenException);
+    await expect(controller.findOne('std-in-b', ketuaAUser)).rejects.toThrow(ForbiddenException);
   });
 
-  it('Ketua kelasId null GET students = 403 (menolak jika ketua kelas tidak memiliki kelasId)', async () => {
+  it('Ketua kelasId null GET students = 403 (menolak jika ketua kelas tidak memiliki kelasId)', () => {
     const ketuaNullUser: SessionUser = {
       id: 'usr-ketua-null',
       email: 'ketua.null@smkn11jakarta.sch.id',
@@ -88,6 +83,6 @@ describe('StudentsController (Access Control - B2 & Blok 0)', () => {
     };
 
     // Harus melempar ForbiddenException karena ketua kelas tanpa kelasId tidak boleh melihat daftar siswa
-    await expect(controller.findAll({}, ketuaNullUser)).rejects.toThrow(ForbiddenException);
+    expect(() => controller.findAll({}, ketuaNullUser)).toThrow(ForbiddenException);
   });
 });

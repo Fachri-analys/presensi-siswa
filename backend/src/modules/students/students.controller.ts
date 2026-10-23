@@ -17,6 +17,7 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentDto } from './dto/query-student.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { assertClassAccess } from '../../common/utils/access-control.util';
 import { Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 
@@ -33,7 +34,9 @@ export class StudentsController {
     @Query() query: QueryStudentDto,
     @CurrentUser() user?: SessionUser,
   ) {
-    // Proteksi IDOR/BOLA: Ketua Kelas hanya dapat melihat siswa di kelasnya sendiri
+    if (user?.role === Role.KETUA_KELAS) {
+      assertClassAccess(user, query.kelasId);
+    }
     const restrictedClassId = user?.role === Role.KETUA_KELAS ? user.kelasId : null;
     return this.studentsService.findAll(query, restrictedClassId);
   }
@@ -41,8 +44,13 @@ export class StudentsController {
   @Get(':id')
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
   @ApiOperation({ summary: 'Detail siswa berdasarkan ID' })
-  findOne(@Param('id') id: string) {
-    return this.studentsService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user?: SessionUser,
+  ) {
+    const student = await this.studentsService.findOne(id);
+    assertClassAccess(user, student.kelasId);
+    return student;
   }
 
   @Post()
