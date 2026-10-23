@@ -12,8 +12,8 @@ export async function loginAndGetCookie(
     .expect(200);
 
   const cookies = response.headers['set-cookie'];
-  if (!cookies || cookies.length === 0) {
+  if (!cookies) {
     throw new Error(`Failed to obtain session cookie for ${email}`);
   }
-  return cookies;
+  return Array.isArray(cookies) ? cookies : [cookies];
 }

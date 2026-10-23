@@ -8,15 +8,14 @@ import {
   Req,
   Res,
   UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { AuthGuard } from '../../common/guards/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import type { SessionUser } from '../../common/types/session-user.type';
 
 @ApiTags('Auth')
@@ -24,6 +23,7 @@ import type { SessionUser } from '../../common/types/session-user.type';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('login')
   @Throttle({ short: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
@@ -57,6 +57,7 @@ export class AuthController {
     return user;
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Logout (hapus sesi)' })
@@ -76,7 +77,6 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(AuthGuard)
   @ApiCookieAuth('session')
   @ApiOperation({ summary: 'Baca sesi saat ini' })
   me(@CurrentUser() user: SessionUser | undefined): SessionUser {

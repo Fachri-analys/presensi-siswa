@@ -1,6 +1,5 @@
 import { PrismaClient, Role, ActiveStatus, AttendanceSession } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 

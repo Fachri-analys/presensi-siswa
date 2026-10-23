@@ -5,15 +5,12 @@ import {
   Param,
   Post,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiConsumes, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SickLettersService, type UploadFile } from './sick-letters.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
-import { AuthGuard } from '../../common/guards/auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
@@ -21,7 +18,6 @@ import type { SessionUser } from '../../common/types/session-user.type';
 
 @ApiTags('SickLetters')
 @ApiCookieAuth('session')
-@UseGuards(AuthGuard, RolesGuard)
 @Controller('sick-letters')
 export class SickLettersController {
   constructor(private readonly sickLettersService: SickLettersService) {}
