@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,19 +8,11 @@ import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
 import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
+import { parseDateOnly } from '../../common/utils/time.util';
 
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private parseDate(dateStr: string): Date {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) {
-      throw new BadRequestException(`Format tanggal "${dateStr}" tidak valid.`);
-    }
-    // Set ke UTC midnight untuk kolom @db.Date
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  }
 
   async saveBatch(dto: BatchAttendanceDto, user: SessionUser) {
     // 1. Proteksi IDOR / BOLA: Ketua Kelas HANYA boleh mengisi kelasnya sendiri
@@ -33,7 +24,7 @@ export class AttendanceService {
       }
     }
 
-    const attendanceDate = this.parseDate(dto.date);
+    const attendanceDate = parseDateOnly(dto.date);
 
     // 2. Periksa jadwal penguncian sesi jika bukan Admin / Guru Piket
     if (user.role === Role.KETUA_KELAS) {
@@ -143,7 +134,7 @@ export class AttendanceService {
       throw new ForbiddenException('Akses ditolak: Anda tidak memiliki akses ke kelas ini.');
     }
 
-    const attendanceDate = this.parseDate(query.date);
+    const attendanceDate = parseDateOnly(query.date);
 
     // Eager loading student untuk mencegah N+1 query
     const attendances = await this.prisma.attendance.findMany({
@@ -177,8 +168,8 @@ export class AttendanceService {
       throw new ForbiddenException('Akses ditolak.');
     }
 
-    const fromDate = this.parseDate(query.from);
-    const toDate = this.parseDate(query.to);
+    const fromDate = parseDateOnly(query.from);
+    const toDate = parseDateOnly(query.to);
 
     // Agregasi grup by tanggal dan status (Hanya 1 query, O(1) query complexity)
     const rawCounts = await this.prisma.attendance.groupBy({
@@ -263,8 +254,8 @@ export class AttendanceService {
 
     // 2. Agregasi status presensi per siswa menggunakan groupBy (Query 2 - Mencegah N+1)
     const dateFilter: { gte?: Date; lte?: Date } = {};
-    if (query.from) dateFilter.gte = this.parseDate(query.from);
-    if (query.to) dateFilter.lte = this.parseDate(query.to);
+    if (query.from) dateFilter.gte = parseDateOnly(query.from);
+    if (query.to) dateFilter.lte = parseDateOnly(query.to);
 
     const counts = await this.prisma.attendance.groupBy({
       by: ['studentId', 'status'],

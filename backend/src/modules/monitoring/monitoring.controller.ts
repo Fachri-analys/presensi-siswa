@@ -3,6 +3,7 @@ import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MonitoringService } from './monitoring.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { todayWib } from '../../common/utils/time.util';
 
 @ApiTags('Monitoring')
 @ApiCookieAuth('session')
@@ -13,8 +14,8 @@ export class MonitoringController {
   @Get('summary')
   @Roles(Role.ADMIN, Role.GURU_PIKET)
   @ApiOperation({ summary: 'Ringkasan kehadiran seluruh kelas (Admin & Guru Piket)' })
-  getSummary(@Query('date') date: string) {
-    const targetDate = date || new Date().toISOString().slice(0, 10);
+  getSummary(@Query('date') date?: string) {
+    const targetDate = date || todayWib();
     return this.monitoringService.getSummary(targetDate);
   }
 }

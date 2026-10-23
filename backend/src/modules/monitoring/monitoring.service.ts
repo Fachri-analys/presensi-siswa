@@ -1,21 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActiveStatus, AttendanceStatus } from '@prisma/client';
+import { parseDateOnly } from '../../common/utils/time.util';
 
 @Injectable()
 export class MonitoringService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private parseDate(dateStr: string): Date {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) {
-      throw new BadRequestException(`Format tanggal "${dateStr}" tidak valid.`);
-    }
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  }
-
   async getSummary(dateStr: string) {
-    const attendanceDate = this.parseDate(dateStr);
+    const attendanceDate = parseDateOnly(dateStr);
 
     // 1. Ambil seluruh kelas aktif beserta jumlah siswa aktif (Query 1)
     const classes = await this.prisma.class.findMany({
