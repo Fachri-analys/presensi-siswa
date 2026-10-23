@@ -205,22 +205,18 @@ export function SuratSakitModal({
 
         const attendanceRepo = createApiAttendanceRepository();
         if (attendanceRepo) {
-          await attendanceRepo
-            .saveClassAttendance({
-              date: tanggal,
-              kelasId: studentClassId,
-              records: [
-                {
-                  nis,
-                  status: "SAKIT",
-                  waktu: null,
-                  keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
-                },
-              ],
-            })
-            .catch((err) => {
-              console.warn("Gagal sinkronisasi presensi ke server:", err);
-            });
+          await attendanceRepo.saveClassAttendance({
+            date: tanggal,
+            kelasId: studentClassId,
+            records: [
+              {
+                nis,
+                status: "SAKIT",
+                waktu: null,
+                keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
+              },
+            ],
+          });
         }
       }
 

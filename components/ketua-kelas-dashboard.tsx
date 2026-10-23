@@ -14,6 +14,7 @@ import { StudentTable } from "./student-table";
 import { btn, field, StatCard, StatusBadge } from "./ui";
 import { useAttendanceWindow } from "./use-attendance-window";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import { apiErrorMessage } from "@/lib/data/api-client";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
 // Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
@@ -43,7 +44,7 @@ interface FormProps {
   options: Student[];
   target?: Student;
   presentAllowedFor: (nis: string) => boolean;
-  onSubmit: (nis: string, status: Status, keterangan: string) => void;
+  onSubmit: (nis: string, status: Status, keterangan: string) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -52,7 +53,7 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
   const [selectedNis, setSelectedNis] = useState(target?.nis ?? "");
   const presentAllowed = presentAllowedFor(selectedNis);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError(null);
     const data = new FormData(e.currentTarget);
@@ -66,7 +67,7 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
       setFormError("Status Hadir/Terlambat di luar jadwal memerlukan izin Guru Piket.");
       return;
     }
-    onSubmit(nis, value, String(data.get("keterangan") ?? "").trim());
+    await onSubmit(nis, value, String(data.get("keterangan") ?? "").trim());
   }
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
@@ -142,17 +143,39 @@ export function KetuaKelasDashboard() {
   const target = students.find((s) => s.nis === dialog?.nis);
   const close = () => setDialog(null);
 
-  function save(nis: string, status: Status, keterangan: string) {
+  async function save(nis: string, status: Status, keterangan: string) {
     const previous = savedAttendance[nis];
     if (PRESENT.includes(status) && !canMarkPresent(activeSession !== null, Boolean(previous?.izinHadir))) {
       setToast("Status Hadir/Terlambat di luar jadwal memerlukan izin Guru Piket.");
       return;
     }
+    const waktu = PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null;
+    const attendanceRepo = createApiAttendanceRepository();
+    if (attendanceRepo) {
+      try {
+        await attendanceRepo.saveClassAttendance({
+          date,
+          kelasId: OWN_CLASS_ID,
+          records: [
+            {
+              nis,
+              status,
+              waktu,
+              keterangan,
+            },
+          ],
+        });
+      } catch (err: unknown) {
+        setToast(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
+        return;
+      }
+    }
+
     const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
     records[nis] = {
       status,
       keterangan,
-      waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null,
+      waktu,
       izinHadir: PRESENT.includes(status) ? false : previous?.izinHadir,
     };
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {
@@ -160,30 +183,23 @@ export function KetuaKelasDashboard() {
       return;
     }
 
-    const attendanceRepo = createApiAttendanceRepository();
-    if (attendanceRepo) {
-      attendanceRepo
-        .saveClassAttendance({
-          date,
-          kelasId: OWN_CLASS_ID,
-          records: [
-            {
-              nis,
-              status,
-              waktu: PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null,
-              keterangan,
-            },
-          ],
-        })
-        .catch((err) => console.warn("Sync saveClassAttendance error:", err));
-    }
-
     addDemoActivity("Presensi siswa diperbarui", `Ketua Kelas mengubah presensi ${target?.nama ?? nis} di kelas ${kelas?.nama}.`);
     close();
     setToast("Presensi disimpan");
   }
 
-  function remove(nis: string) {
+  async function remove(nis: string) {
+    const attendanceRepo = createApiAttendanceRepository();
+    if (attendanceRepo) {
+      try {
+        // Menunggu B4: endpoint DELETE attendance/:id baru tersedia di backend Tahap 4
+        await attendanceRepo.deleteAttendance(nis);
+      } catch (err: unknown) {
+        setToast(`Gagal menghapus presensi: Fitur hapus presensi belum tersedia di server (menunggu B4). ${apiErrorMessage(err)}`);
+        return;
+      }
+    }
+
     const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
     delete records[nis];
     if (!saveDemoAttendance(OWN_CLASS_ID, date, records)) {

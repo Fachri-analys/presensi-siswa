@@ -6,6 +6,7 @@ import { addDemoActivity } from "@/lib/activity-log";
 import { createId } from "@/lib/id";
 import { getDemoTeachers, getDemoTeachersServerSnapshot, subscribeToDemoTeachers, updateDemoTeachers, type DemoTeacher } from "@/lib/demo-teachers";
 import { createApiAdminRepository } from "@/lib/data/api-admin";
+import { apiErrorMessage } from "@/lib/data/api-client";
 import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 import { Dialog } from "./dialog";
 
@@ -29,7 +30,7 @@ export function AdminTeachers() {
     setFormError(null);
   }
 
-  function saveTeacher(event: React.FormEvent<HTMLFormElement>) {
+  async function saveTeacher(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
     const data = new FormData(event.currentTarget);
@@ -48,17 +49,29 @@ export function AdminTeachers() {
 
     const adminRepo = createApiAdminRepository();
     if (editing) {
-      updateDemoTeachers((previous) => previous.map((teacher) => teacher.id === editing.id ? { ...teacher, nip, nama } : teacher));
       if (adminRepo) {
-        adminRepo.updateTeacher(editing.id, { nip, nama }).catch((err) => console.warn("Sync update teacher error:", err));
+        try {
+          await adminRepo.updateTeacher(editing.id, { nip, nama });
+        } catch (err: unknown) {
+          setFormError(`Gagal memperbarui data guru: ${apiErrorMessage(err)}`);
+          return;
+        }
       }
+      updateDemoTeachers((previous) => previous.map((teacher) => teacher.id === editing.id ? { ...teacher, nip, nama } : teacher));
       addDemoActivity("Data guru diperbarui", `Admin memperbarui data ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil diperbarui.`);
     } else {
-      updateDemoTeachers((previous) => [{ id: `g-${createId()}`, nip, nama, status: "active" }, ...previous]);
+      let createdId = `g-${createId()}`;
       if (adminRepo) {
-        adminRepo.createTeacher({ nip, nama }).catch((err) => console.warn("Sync create teacher error:", err));
+        try {
+          const res = await adminRepo.createTeacher({ nip, nama });
+          if (res?.id) createdId = res.id;
+        } catch (err: unknown) {
+          setFormError(`Gagal menambahkan guru: ${apiErrorMessage(err)}`);
+          return;
+        }
       }
+      updateDemoTeachers((previous) => [{ id: createdId, nip, nama, status: "active" }, ...previous]);
       addDemoActivity("Data guru ditambahkan", `Admin menambahkan ${nama} (NIP ${nip}).`);
       setMessage(`Data ${nama} berhasil ditambahkan.`);
     }
@@ -66,24 +79,36 @@ export function AdminTeachers() {
     closeDialog();
   }
 
-  function deleteTeacher(teacher: DemoTeacher) {
-    updateDemoTeachers((previous) => previous.filter((item) => item.id !== teacher.id));
+  async function deleteTeacher(teacher: DemoTeacher) {
     const adminRepo = createApiAdminRepository();
     if (adminRepo) {
-      adminRepo.deleteTeacher(teacher.id).catch((err) => console.warn("Sync delete teacher error:", err));
+      try {
+        await adminRepo.deleteTeacher(teacher.id);
+      } catch (err: unknown) {
+        setMessage(`Gagal menghapus guru: ${apiErrorMessage(err)}`);
+        closeDialog();
+        return;
+      }
     }
+    updateDemoTeachers((previous) => previous.filter((item) => item.id !== teacher.id));
     addDemoActivity("Data guru dihapus", `Admin menghapus data ${teacher.nama} (NIP ${teacher.nip}).`);
     setMessage(`Data ${teacher.nama} berhasil dihapus.`);
     closeDialog();
   }
 
-  function toggleTeacherStatus(teacher: DemoTeacher) {
+  async function toggleTeacherStatus(teacher: DemoTeacher) {
     const status = teacher.status === "active" ? "inactive" : "active";
-    updateDemoTeachers((previous) => previous.map((item) => item.id === teacher.id ? { ...item, status } : item));
     const adminRepo = createApiAdminRepository();
     if (adminRepo) {
-      adminRepo.setTeacherActive(teacher.id, status === "active").catch((err) => console.warn("Sync status teacher error:", err));
+      try {
+        await adminRepo.setTeacherActive(teacher.id, status === "active");
+      } catch (err: unknown) {
+        setMessage(`Gagal mengubah status guru: ${apiErrorMessage(err)}`);
+        closeDialog();
+        return;
+      }
     }
+    updateDemoTeachers((previous) => previous.map((item) => item.id === teacher.id ? { ...item, status } : item));
     addDemoActivity(status === "inactive" ? "Data guru dinonaktifkan" : "Data guru diaktifkan kembali", `Admin mengubah data ${teacher.nama} (NIP ${teacher.nip}) menjadi ${status === "inactive" ? "nonaktif" : "aktif kembali"}.`);
     setMessage(`${teacher.nama} ${status === "inactive" ? "dinonaktifkan" : "diaktifkan kembali"}.`);
     closeDialog();

@@ -11,6 +11,7 @@ import { btn, card, EmptyState, field, StatCard } from "@/components/ui";
 import { useAttendanceWindow } from "@/components/use-attendance-window";
 import { useRole } from "@/components/app-shell";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import { apiErrorMessage } from "@/lib/data/api-client";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
 const classes = getClasses();
@@ -90,12 +91,8 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
     setMessage(null);
   }
 
-  function saveAttendance() {
+  async function saveAttendance() {
     if (!kelas || draft === null) return;
-    if (!saveDemoAttendance(classId, date, attendance)) {
-      setMessage("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
-      return;
-    }
 
     const attendanceRepo = createApiAttendanceRepository();
     if (attendanceRepo) {
@@ -109,14 +106,22 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         }));
 
       if (records.length > 0) {
-        attendanceRepo
-          .saveClassAttendance({
+        try {
+          await attendanceRepo.saveClassAttendance({
             date,
             kelasId: classId,
             records,
-          })
-          .catch((err) => console.warn("Sync saveClassAttendance error:", err));
+          });
+        } catch (err: unknown) {
+          setMessage(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
+          return;
+        }
       }
+    }
+
+    if (!saveDemoAttendance(classId, date, attendance)) {
+      setMessage("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
+      return;
     }
 
     setDraft(null);
