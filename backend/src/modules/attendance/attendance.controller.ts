@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Delete,
   Post,
   Query,
 } from '@nestjs/common';
@@ -61,6 +62,16 @@ export class AttendanceController {
   ) {
     return this.attendanceService.getRecap(query, user);
   }
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
+  @ApiOperation({ summary: 'Hapus catatan presensi berdasarkan ID (B4)' })
+  deleteAttendance(
+    @Param('id') id: string,
+    @CurrentUser() user: SessionUser,
+  ) {
+    return this.attendanceService.deleteAttendance(id, user);
+  }
+
 
   @Get('schedules')
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)

@@ -386,4 +386,40 @@ export class AttendanceService {
       },
     });
   }
+
+  async deleteAttendance(id: string, user: SessionUser) {
+    const attendance = await this.prisma.attendance.findUnique({
+      where: { id },
+      include: { student: { select: { nis: true, nama: true } } },
+    });
+
+    if (!attendance) {
+      throw new NotFoundException(`Catatan presensi dengan ID "${id}" tidak ditemukan.`);
+    }
+
+    // Proteksi IDOR: Ketua Kelas hanya boleh menghapus presensi kelasnya sendiri
+    if (user.role === Role.KETUA_KELAS && user.kelasId !== attendance.kelasId) {
+      throw new ForbiddenException('Akses ditolak: Anda tidak memiliki akses ke kelas ini.');
+    }
+
+    await this.prisma.attendance.delete({ where: { id } });
+
+    // Catat audit log penghapusan
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'ATTENDANCE_DELETED',
+        objectType: 'ATTENDANCE',
+        objectId: id,
+        result: 'SUCCESS',
+        metadata: {
+          date: attendance.date.toISOString().slice(0, 10),
+          kelasId: attendance.kelasId,
+          nis: attendance.student.nis,
+          nama: attendance.student.nama,
+          status: attendance.status,
+        },
+      },
+    });
+  }
 }

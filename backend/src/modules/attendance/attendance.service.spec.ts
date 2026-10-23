@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AttendanceService } from './attendance.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
 
 // Default mock nowWibTime ke jam 08:00 (dalam window sesi PAGI default)
@@ -26,6 +26,8 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       attendance: {
         upsert: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
         groupBy: jest.fn(),
       },
       schedule: {
@@ -377,5 +379,79 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
 
     // Pastikan dipanggil menggunakan agregasi groupBy, bukan looping individual query
     expect(mockPrisma.attendance.groupBy).toHaveBeenCalledTimes(1);
+  });
+
+  // --- B4: DELETE attendance ---
+
+  // [B4-01] deleteAttendance() menghapus catatan presensi dan mencatat audit
+  it('[B4-01] deleteAttendance() menghapus catatan dan mencatat audit log', async () => {
+    const user = {
+      id: 'usr-guru',
+      email: 'guru@test.com',
+      nama: 'Guru Piket',
+      role: Role.GURU_PIKET,
+      kelasId: null,
+    };
+
+    mockPrisma.attendance.findUnique.mockResolvedValueOnce({
+      id: 'att-1',
+      kelasId: 'cls-1',
+      studentId: 'std-1',
+      date: new Date('2026-10-16'),
+      status: AttendanceStatus.HADIR,
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+    mockPrisma.attendance.delete.mockResolvedValueOnce({ id: 'att-1' });
+
+    await service.deleteAttendance('att-1', user);
+
+    expect(mockPrisma.attendance.delete).toHaveBeenCalledWith({ where: { id: 'att-1' } });
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'usr-guru',
+          action: 'ATTENDANCE_DELETED',
+          objectType: 'ATTENDANCE',
+          objectId: 'att-1',
+        }),
+      }),
+    );
+  });
+
+  // [B4-02] deleteAttendance() melempar NotFoundException jika ID tidak ditemukan
+  it('[B4-02] deleteAttendance() melempar NotFoundException jika ID tidak ditemukan', async () => {
+    const user = {
+      id: 'usr-guru',
+      email: 'guru@test.com',
+      nama: 'Guru Piket',
+      role: Role.GURU_PIKET,
+      kelasId: null,
+    };
+
+    mockPrisma.attendance.findUnique.mockResolvedValueOnce(null);
+
+    await expect(service.deleteAttendance('att-unknown', user)).rejects.toThrow(NotFoundException);
+  });
+
+  // [B4-03] deleteAttendance() menolak Ketua Kelas menghapus presensi kelas lain
+  it('[B4-03] deleteAttendance() melempar ForbiddenException untuk Ketua Kelas kelas lain', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    mockPrisma.attendance.findUnique.mockResolvedValueOnce({
+      id: 'att-1',
+      kelasId: 'cls-other', // Kelas berbeda
+      studentId: 'std-1',
+      date: new Date('2026-10-16'),
+      status: AttendanceStatus.HADIR,
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+
+    await expect(service.deleteAttendance('att-1', ketuaUser)).rejects.toThrow(ForbiddenException);
   });
 });
