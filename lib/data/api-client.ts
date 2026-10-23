@@ -156,6 +156,14 @@ export function createApiClient(baseUrl: string, fetcher: typeof fetch = fetch) 
     const requestId = response.headers.get("x-request-id");
     if (!response.ok) {
       const code = API_ERROR_CODES[response.status] ?? (response.status >= 500 ? "SERVER_ERROR" : "HTTP_ERROR");
+      if (
+        response.status === 401 &&
+        path !== "auth/me" &&
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
+        window.location.href = "/login";
+      }
       throw new ApiError(code, response.status, requestId);
     }
 

@@ -16,11 +16,6 @@ export function getDemoSessionRole(): Role | null {
   return isRole(value) ? value : null;
 }
 
-export function setDemoSessionRole(role: Role) {
-  window.sessionStorage.setItem(STORAGE_KEY, role);
-  window.dispatchEvent(new Event(SESSION_EVENT));
-}
-
 export function clearDemoSession() {
   window.sessionStorage.removeItem(STORAGE_KEY);
   window.dispatchEvent(new Event(SESSION_EVENT));

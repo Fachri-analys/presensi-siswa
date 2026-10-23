@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Activity, ClipboardCheck, FileText, History, LayoutDashboard, LogOut, Menu, School, SlidersHorizontal, Users, X, type LucideIcon } from "lucide-react";
 import { addDemoActivity } from "@/lib/activity-log";
-import { clearDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot, subscribeToDemoSession } from "@/lib/demo-session";
-import { getClass, OWN_CLASS_ID } from "@/lib/mock";
+import { clearDemoSession } from "@/lib/demo-session";
+import type { SessionUser } from "@/lib/data/contracts";
 import type { Role } from "@/lib/types";
 import { Logo } from "./logo";
 import { createApiAuthRepository } from "@/lib/data/api-auth";
@@ -31,7 +31,15 @@ const NAV: { href: string; label: string; icon: LucideIcon; roles: Role[] }[] = 
   { href: "/pengaturan", label: "Pengaturan", icon: SlidersHorizontal, roles: ALL },
 ];
 
-const RoleContext = createContext<{ role: Role } | null>(null);
+export interface RoleContextValue {
+  role: Role;
+  user: SessionUser | null;
+  kelasId: string | null;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<SessionUser | null>;
+}
+
+const RoleContext = createContext<RoleContextValue | null>(null);
 
 export function useRole() {
   const ctx = useContext(RoleContext);
@@ -43,11 +51,60 @@ export function useRole() {
  * Role tersimpan hanya untuk simulasi; otorisasi produksi harus berasal dari sesi server.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const sessionRole = useSyncExternalStore(subscribeToDemoSession, getDemoSessionRole, getDemoSessionServerSnapshot);
-  const role = sessionRole ?? "KETUA_KELAS";
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  async function refreshSession(): Promise<SessionUser | null> {
+    const authRepo = createApiAuthRepository();
+    if (!authRepo) {
+      setSessionUser(null);
+      setLoading(false);
+      return null;
+    }
+    try {
+      const user = await authRepo.getSession();
+      setSessionUser(user);
+      setLoading(false);
+      return user;
+    } catch {
+      setSessionUser(null);
+      setLoading(false);
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+    const authRepo = createApiAuthRepository();
+    if (!authRepo) {
+      setLoading(false);
+      router.replace("/login");
+      return;
+    }
+    authRepo.getSession().then((user) => {
+      if (!active) return;
+      if (!user) {
+        setSessionUser(null);
+        setLoading(false);
+        router.replace("/login");
+      } else {
+        setSessionUser(user);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!active) return;
+      setSessionUser(null);
+      setLoading(false);
+      router.replace("/login");
+    });
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -56,27 +113,30 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [open]);
-  useEffect(() => {
-    if (!sessionRole) router.replace("/login");
-  }, [router, sessionRole]);
+
+  const role: Role = sessionUser?.role ?? "KETUA_KELAS";
+  const kelasId: string | null = sessionUser?.kelasId ?? null;
   const items = NAV.filter((item) => role === "ADMIN" || item.roles.includes(role));
   const current = items.find((item) => pathname.startsWith(item.href));
   const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  function logout() {
+  async function logout() {
     addDemoActivity("Keluar dari aplikasi", `${ROLES[role].label} keluar dari sistem presensi.`);
     const authRepo = createApiAuthRepository();
     if (authRepo) {
-      authRepo.logout().catch((err) => {
+      try {
+        await authRepo.logout();
+      } catch (err) {
         console.warn("Gagal logout dari server backend:", err);
-      });
+      }
     }
     clearDemoSession();
+    setSessionUser(null);
     setOpen(false);
     router.replace("/login");
   }
 
-  if (!sessionRole) {
+  if (loading || !sessionUser) {
     return (
       <main className="grid min-h-screen place-items-center p-6 text-center" role="status">
         <div>
@@ -88,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <RoleContext value={{ role }}>
+    <RoleContext value={{ role, user: sessionUser, kelasId, logout, refreshSession }}>
       <div className="min-h-screen print:pl-0">
         {open && (
           <button
@@ -147,7 +207,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="mt-auto rounded-[8px] bg-sidebar-chip p-4">
             <p className="text-sm font-semibold text-white">{ROLES[role].label}</p>
-            <p className="text-xs text-white/65">{role === "KETUA_KELAS" ? getClass(OWN_CLASS_ID)?.nama ?? ROLES[role].note : ROLES[role].note}</p>
+            <p className="text-xs text-white/65">{role === "KETUA_KELAS" ? (sessionUser?.kelasId ? `Kelas: ${sessionUser.kelasId}` : ROLES[role].note) : ROLES[role].note}</p>
           </div>
         </aside>
 
@@ -174,7 +234,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Data simulasi
             </p>
             <div className="hidden size-10 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary sm:grid">
-              {ROLES[role].initials}
+              {sessionUser?.nama ? sessionUser.nama.slice(0, 2).toUpperCase() : ROLES[role].initials}
             </div>
             <button type="button" onClick={logout} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-semibold hover:bg-primary-soft" aria-label={`Keluar dari akun ${ROLES[role].label}`}>
               <LogOut size={18} aria-hidden />

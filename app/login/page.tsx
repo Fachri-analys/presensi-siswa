@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/logo";
 import { btn, field } from "@/components/ui";
-import { getDemoSessionRole, setDemoSessionRole } from "@/lib/demo-session";
 import { createApiAuthRepository } from "@/lib/data/api-auth";
 import { apiErrorMessage } from "@/lib/data/api-client";
 
@@ -15,7 +14,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (getDemoSessionRole()) router.replace("/dashboard");
+    const authRepo = createApiAuthRepository();
+    if (authRepo) {
+      authRepo.getSession().then((user) => {
+        if (user) router.replace("/dashboard");
+      }).catch(() => {});
+    }
   }, [router]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -41,8 +45,7 @@ export default function LoginPage() {
     }
 
     try {
-      const sessionUser = await authRepo.login({ identifier, password });
-      setDemoSessionRole(sessionUser.role);
+      await authRepo.login({ identifier, password });
       router.push("/dashboard");
     } catch (err: unknown) {
       const isAuthError =
