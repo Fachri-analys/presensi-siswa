@@ -78,28 +78,32 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const authRepo = createApiAuthRepository();
-    if (!authRepo) {
-      setLoading(false);
-      router.replace("/login");
-      return;
-    }
-    authRepo.getSession().then((user) => {
-      if (!active) return;
-      if (!user) {
-        setSessionUser(null);
+    const checkSession = async () => {
+      const authRepo = createApiAuthRepository();
+      if (!authRepo) {
+        if (!active) return;
         setLoading(false);
         router.replace("/login");
-      } else {
-        setSessionUser(user);
-        setLoading(false);
+        return;
       }
-    }).catch(() => {
-      if (!active) return;
-      setSessionUser(null);
-      setLoading(false);
-      router.replace("/login");
-    });
+      try {
+        const user = await authRepo.getSession();
+        if (!active) return;
+        if (!user) {
+          setSessionUser(null);
+          router.replace("/login");
+        } else {
+          setSessionUser(user);
+        }
+      } catch {
+        if (!active) return;
+        setSessionUser(null);
+        router.replace("/login");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void checkSession();
     return () => {
       active = false;
     };

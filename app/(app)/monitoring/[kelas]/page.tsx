@@ -15,26 +15,26 @@ export default function ClassDetailPage({ params }: { params: Promise<{ kelas: s
 
   useEffect(() => {
     let active = true;
-    const schoolRepo = createApiSchoolRepository();
-    if (!schoolRepo) {
-      setLoading(false);
-      return;
-    }
-
-    schoolRepo
-      .getClass(kelas)
-      .then((data) => {
+    const fetchClass = async () => {
+      const schoolRepo = createApiSchoolRepository();
+      if (!schoolRepo) {
+        if (!active) return;
+        setLoading(false);
+        return;
+      }
+      try {
+        const data = await schoolRepo.getClass(kelas);
         if (!active) return;
         setClassData(data);
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!active) return;
         console.warn("Gagal memuat detail kelas dari API:", err);
         setError("Kelas tidak ditemukan atau gagal dimuat dari server.");
-        setLoading(false);
-      });
-
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void fetchClass();
     return () => {
       active = false;
     };
