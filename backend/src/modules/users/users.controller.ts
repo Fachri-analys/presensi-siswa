@@ -52,13 +52,6 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
-  @Post(':id/reset-password')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Reset password pengguna (Hanya Admin)' })
-  resetPassword(@Param('id') id: string) {
-    return this.usersService.resetPassword(id);
-  }
-
   @Delete(':id')
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)

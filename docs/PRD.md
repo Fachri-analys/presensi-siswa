@@ -8,7 +8,7 @@
 
 ## 1. Ringkasan
 
-Sistem Presensi Siswa membantu sekolah mencatat kehadiran murid per kelas, memantau status presensi, melihat riwayat, menghasilkan laporan, dan mengelola data induk sekolah. Antarmuka frontend saat ini merupakan prototipe demo. Backend yang akan dibuat harus menjadi sumber kebenaran untuk identitas, otorisasi, data sekolah, presensi, dan audit.
+Sistem Presensi Siswa membantu sekolah mencatat kehadiran murid per kelas, memantau status presensi, melihat riwayat, menghasilkan laporan, dan mengelola data induk sekolah. Frontend Next.js terhubung ke backend NestJS; backend menjadi sumber kebenaran untuk identitas, otorisasi, data sekolah, presensi, jadwal, dan audit.
 
 Sistem mempunyai tiga role: Ketua Kelas, Guru Piket, dan Admin. Ketua Kelas bertugas mencatat presensi hanya untuk kelas yang ditugaskan. Guru Piket mengelola presensi lintas kelas. Admin mempunyai kewenangan tertinggi atas data sekolah dan akun.
 
@@ -48,7 +48,7 @@ Perlu melihat seluruh kelas, mengisi/mengoreksi/menghapus presensi lintas kelas,
 
 ### Admin
 
-Perlu memantau seluruh data, melakukan semua operasi presensi sesuai kebijakan, mengelola siswa/guru/kelas/akun, mengaktifkan atau menonaktifkan data, menetapkan Ketua Kelas, meminta reset password akun melalui alur aman, dan melihat log aktivitas.
+Perlu memantau seluruh data, melakukan semua operasi presensi sesuai kebijakan, mengelola siswa/guru/kelas/akun, mengaktifkan atau menonaktifkan data, menetapkan Ketua Kelas, mengganti password akun, dan melihat log aktivitas.
 
 ## 6. Ruang lingkup fitur MVP
 
@@ -72,7 +72,7 @@ Perlu memantau seluruh data, melakukan semua operasi presensi sesuai kebijakan, 
 3. Ketua Kelas dapat CRUD **presensi** di kelas tugas, bukan CRUD data siswa atau akun.
 4. Guru Piket dapat CRUD **presensi** di semua kelas, tetapi tidak CRUD siswa/guru/kelas/akun.
 5. Admin adalah role dengan hak tertinggi dan dapat mengelola data induk/akun.
-6. Hanya Admin yang boleh memulai reset password akun. Reset mengikuti alur aman yang disediakan backend dan tidak mengembalikan password plaintext.
+6. Hanya Admin yang boleh mengganti password akun. Backend menyimpan hash password dan membatalkan sesi akun saat password berubah. Reset mandiri belum disediakan.
 7. Hanya Admin yang boleh menghapus data siswa/guru/kelas/akun secara permanen, dengan pemeriksaan keterkaitan dan kebijakan retensi. Nonaktifkan data jika penghapusan akan merusak riwayat.
 8. Siswa/guru nonaktif tidak dipilih untuk transaksi baru, tetapi catatan historis dipertahankan.
 9. Semua endpoint terlindungi memeriksa identitas, status akun, role, dan cakupan objek pada server.
@@ -124,7 +124,7 @@ Kriteria rilis MVP yang dapat diuji:
 - Kalender hari belajar, hari libur, zona waktu sekolah, keterlambatan, dan periode laporan memengaruhi hasil statistik.
 - Kebijakan retensi dan penghapusan dapat memengaruhi relasi presensi historis.
 - Strategi cookie, domain deployment, HTTPS, CSRF, dan CORS harus cocok dengan deployment frontend.
-- Akun awal Admin, proses onboarding, dan kanal reset password perlu ditentukan dan tidak boleh bergantung pada password demo.
+- Admin awal dibuat satu kali melalui variabel environment lokal saat seed; Admin dapat mengganti password akun dari pengaturan. Alur reset mandiri melalui tautan email belum disediakan.
 
 ## 11. Keputusan yang masih perlu disepakati
 

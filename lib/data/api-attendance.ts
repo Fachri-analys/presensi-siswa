@@ -7,6 +7,7 @@ import type {
   AttendanceReportQuery,
   AttendanceRepository,
   HistoryRow,
+  PresentPermissionInput,
 } from "./contracts";
 import { decodeAttendanceRecord, decodeAttendanceReport, decodeHistoryRow } from "./decoders";
 
@@ -64,6 +65,10 @@ export function createApiAttendanceRepository(fetcher?: typeof fetch): Attendanc
         },
         () => undefined,
       );
+    },
+
+    async grantPresentPermission(input: PresentPermissionInput, signal?: AbortSignal): Promise<void> {
+      await request("attendance/permissions", { method: "POST", body: input, signal }, () => undefined);
     },
 
     async getHistory(query: AttendanceHistoryQuery, signal?: AbortSignal): Promise<HistoryRow[]> {

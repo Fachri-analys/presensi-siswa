@@ -4,7 +4,7 @@ import request from 'supertest';
 export async function loginAndGetCookie(
   app: INestApplication,
   email: string,
-  password = 'Ketua#2026Password!',
+  password: string,
 ): Promise<string[]> {
   const response = await request(app.getHttpServer())
     .post('/api/v1/auth/login')

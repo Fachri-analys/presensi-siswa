@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,9 +8,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
-import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma/client';
+import { ActiveStatus, AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import { parseDateOnly, nowWibTime } from '../../common/utils/time.util';
+import { assertClassAccess } from '../../common/utils/access-control.util';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
+import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -25,10 +30,13 @@ export class AttendanceService {
     }
 
     const attendanceDate = parseDateOnly(dto.date);
+    const kelas = await this.prisma.class.findUnique({ where: { id: dto.kelasId }, select: { status: true } });
+    if (!kelas || kelas.status !== ActiveStatus.active) {
+      throw new NotFoundException('Kelas aktif tidak ditemukan.');
+    }
+    const markedAt = nowWibTime();
 
-    // 2. Enforcement jadwal sesi untuk Ketua Kelas (B3: FR-ATT-12)
-    //    HADIR/TERLAMBAT hanya boleh dicatat dalam window sesi terbuka.
-    //    IZIN/SAKIT/ALPA selalu diizinkan.
+    let presentWindowOpen = true;
     if (user.role === Role.KETUA_KELAS) {
       const hasPresent = dto.records.some(
         (r) => r.status === AttendanceStatus.HADIR || r.status === AttendanceStatus.TERLAMBAT,
@@ -36,39 +44,27 @@ export class AttendanceService {
 
       if (hasPresent) {
         const schedules = await this.prisma.schedule.findMany();
-        const currentTime = nowWibTime();
-
         // Cek apakah ada sesi yang window-nya terbuka dan tidak terkunci
         const openSession = schedules.find(
-          (s) => !s.terkunci && currentTime >= s.mulai && currentTime <= s.selesai,
+          (s) => !s.terkunci && markedAt >= s.mulai && markedAt < s.selesai,
         );
-
-        if (!openSession) {
-          // Cek izin khusus (permission) per kelas/tanggal
-          const permission = await this.prisma.attendancePermission.findFirst({
-            where: {
-              date: attendanceDate,
-              kelasId: dto.kelasId,
-              usedAt: null,
-            },
-          });
-          if (!permission) {
-            throw new ForbiddenException(
-              'Sesi presensi saat ini tidak aktif atau terkunci. ' +
-              'Ketua Kelas hanya dapat mencatat HADIR/TERLAMBAT dalam window sesi terbuka. ' +
-              'Hubungi Guru Piket untuk membuka izin presensi.',
-            );
-          }
-        }
+        presentWindowOpen = Boolean(openSession);
       }
     }
 
     // 3. Eager load siswa di kelas untuk memetakan NIS -> studentId (1 query, cegah N+1)
     const students = await this.prisma.student.findMany({
-      where: { kelasId: dto.kelasId },
+      where: { kelasId: dto.kelasId, status: ActiveStatus.active },
       select: { id: true, nis: true },
     });
     const studentMap = new Map(students.map((s) => [s.nis, s.id]));
+    const nisValues = dto.records.map((record) => record.nis);
+    if (new Set(nisValues).size !== nisValues.length) {
+      throw new BadRequestException('Setiap siswa hanya boleh muncul satu kali dalam satu batch.');
+    }
+    if (nisValues.some((nis) => !studentMap.has(nis))) {
+      throw new BadRequestException('Batch memuat siswa yang tidak aktif atau bukan anggota kelas tersebut.');
+    }
 
     // 4. Batch Transaksi Database atomik untuk mencegah race condition & data inconsistent
     const results = await this.prisma.$transaction(async (tx) => {
@@ -76,7 +72,27 @@ export class AttendanceService {
 
       for (const rec of dto.records) {
         const studentId = studentMap.get(rec.nis);
-        if (!studentId) continue;
+        if (!studentId) throw new BadRequestException('Siswa tidak ditemukan pada kelas tersebut.');
+
+        if (
+          user.role === Role.KETUA_KELAS &&
+          !presentWindowOpen &&
+          (rec.status === AttendanceStatus.HADIR || rec.status === AttendanceStatus.TERLAMBAT)
+        ) {
+          const permission = await tx.attendancePermission.findFirst({
+            where: { date: attendanceDate, kelasId: dto.kelasId, studentId, usedAt: null },
+          });
+          if (!permission) {
+            throw new ForbiddenException('Izin Guru Piket untuk siswa ini tidak tersedia atau sudah digunakan.');
+          }
+          const consumed = await tx.attendancePermission.updateMany({
+            where: { id: permission.id, usedAt: null },
+            data: { usedAt: new Date(), usedById: user.id },
+          });
+          if (consumed.count !== 1) {
+            throw new ForbiddenException('Izin Guru Piket untuk siswa ini sudah digunakan.');
+          }
+        }
 
         const saved = await tx.attendance.upsert({
           where: {
@@ -91,7 +107,9 @@ export class AttendanceService {
             kelasId: dto.kelasId,
             studentId,
             status: rec.status,
-            waktu: rec.waktu ?? null,
+          waktu: rec.status === AttendanceStatus.HADIR || rec.status === AttendanceStatus.TERLAMBAT
+            ? (user.role === Role.KETUA_KELAS ? markedAt : rec.waktu ?? null)
+            : null,
             keterangan: rec.keterangan ?? '',
             createdById: user.id,
             updatedById: user.id,
@@ -358,32 +376,126 @@ export class AttendanceService {
     };
   }
 
-  async getSchedules() {
-    return this.prisma.schedule.findMany({
-      orderBy: { session: 'asc' },
+  async grantPresentPermission(dto: CreateAttendancePermissionDto, user: SessionUser) {
+    const date = parseDateOnly(dto.date);
+    const kelas = await this.prisma.class.findUnique({
+      where: { id: dto.kelasId },
+      select: { id: true, status: true },
+    });
+    if (!kelas || kelas.status !== ActiveStatus.active) {
+      throw new NotFoundException('Kelas aktif tidak ditemukan.');
+    }
+
+    const student = await this.prisma.student.findFirst({
+      where: { nis: dto.nis, kelasId: dto.kelasId, status: ActiveStatus.active },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Siswa aktif tidak ditemukan pada kelas tersebut.');
+
+    const existing = await this.prisma.attendancePermission.findUnique({
+      where: { date_kelasId_studentId: { date, kelasId: dto.kelasId, studentId: student.id } },
+    });
+    if (existing) throw new ConflictException('Izin satu kali untuk siswa ini sudah pernah diberikan.');
+
+    return this.prisma.$transaction(async (tx) => {
+      const permission = await tx.attendancePermission.create({
+        data: { date, kelasId: dto.kelasId, studentId: student.id, grantedById: user.id },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'ATTENDANCE_PERMISSION_GRANTED',
+          objectType: 'ATTENDANCE_PERMISSION',
+          objectId: permission.id,
+          result: 'SUCCESS',
+          metadata: { date: dto.date, kelasId: dto.kelasId, nis: dto.nis },
+        },
+      });
+      return permission;
     });
   }
 
-  async updateSchedule(
-    session: AttendanceSession,
-    dto: { mulai?: string; selesai?: string; terkunci?: boolean },
-    user: SessionUser,
-  ) {
-    return this.prisma.schedule.upsert({
-      where: { session },
-      create: {
-        session,
-        mulai: dto.mulai ?? '07:00',
-        selesai: dto.selesai ?? '12:00',
-        terkunci: dto.terkunci ?? false,
-        updatedById: user.id,
-      },
-      update: {
-        ...(dto.mulai ? { mulai: dto.mulai } : {}),
-        ...(dto.selesai ? { selesai: dto.selesai } : {}),
-        ...(dto.terkunci !== undefined ? { terkunci: dto.terkunci } : {}),
-        updatedById: user.id,
-      },
+  async updateAttendance(id: string, dto: UpdateAttendanceDto, user: SessionUser) {
+    const attendance = await this.prisma.attendance.findUnique({
+      where: { id },
+      include: { student: { select: { nis: true, nama: true } } },
+    });
+    if (!attendance) throw new NotFoundException('Catatan presensi tidak ditemukan.');
+    assertClassAccess(user, attendance.kelasId);
+
+    const needsPermission =
+      user.role === Role.KETUA_KELAS &&
+      attendance.status !== AttendanceStatus.HADIR &&
+      attendance.status !== AttendanceStatus.TERLAMBAT &&
+      (dto.status === AttendanceStatus.HADIR || dto.status === AttendanceStatus.TERLAMBAT);
+    let presentWindowOpen = true;
+    if (needsPermission) {
+      const currentTime = nowWibTime();
+      const schedules = await this.prisma.schedule.findMany();
+      presentWindowOpen = schedules.some(
+        (schedule) => !schedule.terkunci && currentTime >= schedule.mulai && currentTime < schedule.selesai,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (needsPermission && !presentWindowOpen) {
+        const permission = await tx.attendancePermission.findFirst({
+          where: {
+            date: attendance.date,
+            kelasId: attendance.kelasId,
+            studentId: attendance.studentId,
+            usedAt: null,
+          },
+        });
+        if (!permission) throw new ForbiddenException('Izin Guru Piket untuk siswa ini tidak tersedia atau sudah digunakan.');
+        const consumed = await tx.attendancePermission.updateMany({
+          where: { id: permission.id, usedAt: null },
+          data: { usedAt: new Date(), usedById: user.id },
+        });
+        if (consumed.count !== 1) throw new ForbiddenException('Izin Guru Piket untuk siswa ini sudah digunakan.');
+      }
+
+      const updated = await tx.attendance.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          waktu: dto.status === AttendanceStatus.HADIR || dto.status === AttendanceStatus.TERLAMBAT
+            ? (user.role === Role.KETUA_KELAS ? nowWibTime() : dto.waktu === undefined ? attendance.waktu : dto.waktu)
+            : null,
+          keterangan: dto.keterangan ?? '',
+          updatedById: user.id,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'ATTENDANCE_UPDATED',
+          objectType: 'ATTENDANCE',
+          objectId: id,
+          result: 'SUCCESS',
+          metadata: {
+            date: attendance.date.toISOString().slice(0, 10),
+            kelasId: attendance.kelasId,
+            nis: attendance.student.nis,
+            fromStatus: attendance.status,
+            toStatus: updated.status,
+          },
+        },
+      });
+
+      return {
+        id: updated.id,
+        date: updated.date.toISOString().slice(0, 10),
+        kelasId: updated.kelasId,
+        nis: attendance.student.nis,
+        nama: attendance.student.nama,
+        status: updated.status,
+        waktu: updated.waktu,
+        keterangan: updated.keterangan,
+        createdBy: updated.createdById,
+        updatedBy: updated.updatedById,
+        updatedAt: updated.updatedAt.toISOString(),
+      };
     });
   }
 
@@ -397,29 +509,26 @@ export class AttendanceService {
       throw new NotFoundException(`Catatan presensi dengan ID "${id}" tidak ditemukan.`);
     }
 
-    // Proteksi IDOR: Ketua Kelas hanya boleh menghapus presensi kelasnya sendiri
-    if (user.role === Role.KETUA_KELAS && user.kelasId !== attendance.kelasId) {
-      throw new ForbiddenException('Akses ditolak: Anda tidak memiliki akses ke kelas ini.');
-    }
+    assertClassAccess(user, attendance.kelasId);
 
-    await this.prisma.attendance.delete({ where: { id } });
-
-    // Catat audit log penghapusan
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: user.id,
-        action: 'ATTENDANCE_DELETED',
-        objectType: 'ATTENDANCE',
-        objectId: id,
-        result: 'SUCCESS',
-        metadata: {
-          date: attendance.date.toISOString().slice(0, 10),
-          kelasId: attendance.kelasId,
-          nis: attendance.student.nis,
-          nama: attendance.student.nama,
-          status: attendance.status,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.attendance.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: 'ATTENDANCE_DELETED',
+          objectType: 'ATTENDANCE',
+          objectId: id,
+          result: 'SUCCESS',
+          metadata: {
+            date: attendance.date.toISOString().slice(0, 10),
+            kelasId: attendance.kelasId,
+            nis: attendance.student.nis,
+            nama: attendance.student.nama,
+            status: attendance.status,
+          },
         },
-      },
+      });
     });
   }
 }

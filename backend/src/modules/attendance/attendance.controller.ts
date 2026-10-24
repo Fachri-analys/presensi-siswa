@@ -14,8 +14,10 @@ import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AttendanceSession, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
+import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
 
 @ApiTags('Attendance')
 @ApiCookieAuth('session')
@@ -41,6 +43,27 @@ export class AttendanceController {
     @CurrentUser() user: SessionUser,
   ) {
     return this.attendanceService.saveBatch(dto, user);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
+  @ApiOperation({ summary: 'Koreksi satu catatan presensi' })
+  updateAttendance(
+    @Param('id') id: string,
+    @Body() dto: UpdateAttendanceDto,
+    @CurrentUser() user: SessionUser,
+  ) {
+    return this.attendanceService.updateAttendance(id, dto, user);
+  }
+
+  @Post('permissions')
+  @Roles(Role.ADMIN, Role.GURU_PIKET)
+  @ApiOperation({ summary: 'Beri izin satu kali untuk mencatat Hadir/Terlambat di luar sesi' })
+  grantPresentPermission(
+    @Body() dto: CreateAttendancePermissionDto,
+    @CurrentUser() user: SessionUser,
+  ) {
+    return this.attendanceService.grantPresentPermission(dto, user);
   }
 
   @Get('history')
@@ -70,24 +93,5 @@ export class AttendanceController {
     @CurrentUser() user: SessionUser,
   ) {
     return this.attendanceService.deleteAttendance(id, user);
-  }
-
-
-  @Get('schedules')
-  @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
-  @ApiOperation({ summary: 'Daftar jadwal sesi presensi' })
-  getSchedules() {
-    return this.attendanceService.getSchedules();
-  }
-
-  @Patch('schedules/:session')
-  @Roles(Role.ADMIN, Role.GURU_PIKET)
-  @ApiOperation({ summary: 'Update jam sesi / kunci sesi presensi (Admin & Guru Piket)' })
-  updateSchedule(
-    @Param('session') session: AttendanceSession,
-    @Body() dto: { mulai?: string; selesai?: string; terkunci?: boolean },
-    @CurrentUser() user: SessionUser,
-  ) {
-    return this.attendanceService.updateSchedule(session, dto, user);
   }
 }

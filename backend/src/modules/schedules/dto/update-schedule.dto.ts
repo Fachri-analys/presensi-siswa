@@ -3,12 +3,12 @@ import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 export class UpdateScheduleDto {
   @IsOptional()
   @IsString()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'Format mulai harus HH:MM' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Format mulai harus HH:MM yang valid' })
   mulai?: string;
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'Format selesai harus HH:MM' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Format selesai harus HH:MM yang valid' })
   selesai?: string;
 
   @IsOptional()

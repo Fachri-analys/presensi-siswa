@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -14,13 +14,12 @@ import {
 } from "lucide-react";
 import { Dialog } from "./dialog";
 import { btn, field } from "./ui";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getClasses } from "@/lib/mock";
-import { getLocalDateKey, saveDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot, subscribeToDemoAttendance } from "@/lib/demo-attendance";
-import { addDemoActivity } from "@/lib/activity-log";
+import { getLocalDateKey } from "@/lib/time";
 import { useRole } from "./app-shell";
 import { getApiBaseUrl } from "@/lib/data/api-client";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import type { SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 
 interface SuratSakitModalProps {
   open: boolean;
@@ -47,9 +46,22 @@ export function SuratSakitModal({
   const { role, kelasId: sessionClassId } = useRole();
   const isKetuaKelas = role === "KETUA_KELAS";
   const activeClassId = isKetuaKelas ? (sessionClassId ?? initialClassId) : (initialClassId ?? sessionClassId);
-  const classes = getClasses();
-  const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
-  const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [students, setStudents] = useState<SchoolStudent[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void Promise.resolve().then(() => {
+      const repo = createApiSchoolRepository();
+      if (!repo) { setErrorMessage("Backend belum dikonfigurasi."); return; }
+      return Promise.all([
+        repo.listClasses(),
+        repo.listStudents({ kelasId: activeClassId ?? undefined, status: "active", limit: 100 }),
+      ]).then(([classPage, studentPage]) => { setClasses(classPage.items); setStudents(studentPage.items); })
+        .catch(() => setErrorMessage("Data kelas dan siswa gagal dimuat dari backend."));
+    });
+  }, [open, activeClassId]);
 
   // Filter siswa aktif sesuai kelas
   const availableStudents = students.filter(
@@ -68,7 +80,6 @@ export function SuratSakitModal({
   // Status & error states
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submittedInfo, setSubmittedInfo] = useState<{
     nama: string;
     nis: string;
@@ -185,7 +196,8 @@ export function SuratSakitModal({
       }
 
       const baseUrl = getApiBaseUrl();
-      if (baseUrl) {
+      if (!baseUrl) throw new Error("Backend belum dikonfigurasi.");
+      {
         const formData = new FormData();
         formData.append("file", selectedFile!);
         formData.append("date", tanggal);
@@ -207,8 +219,8 @@ export function SuratSakitModal({
         }
 
         const attendanceRepo = createApiAttendanceRepository();
-        if (attendanceRepo) {
-          await attendanceRepo.saveClassAttendance({
+        if (!attendanceRepo) throw new Error("Backend belum dikonfigurasi.");
+        await attendanceRepo.saveClassAttendance({
             date: tanggal,
             kelasId: studentClassId,
             records: [
@@ -219,32 +231,8 @@ export function SuratSakitModal({
                 keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
               },
             ],
-          });
-        }
+        });
       }
-
-      // Update data presensi demo agar status siswa tersimpan sebagai SAKIT
-      const currentAttendance = attendanceStore[`${tanggal}::${studentClassId}`] ?? {};
-      const updatedAttendance = {
-        ...currentAttendance,
-        [nis]: {
-          status: "SAKIT" as const,
-          keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
-          waktu: null,
-          izinHadir: false,
-        },
-      };
-
-      const saved = saveDemoAttendance(studentClassId, tanggal, updatedAttendance);
-      if (!saved && !baseUrl) {
-        throw new Error("Penyimpanan presensi lokal gagal.");
-      }
-
-      // Catat di audit log
-      addDemoActivity(
-        "Surat sakit diserahkan",
-        `Surat sakit siswa ${studentName} (${nis}) untuk tanggal ${tanggal} berhasil diunggah (${selectedFile!.name}).`
-      );
 
       setSubmittedInfo({
         nama: studentName,

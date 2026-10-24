@@ -24,7 +24,11 @@ export class SickLettersController {
 
   @Post('upload')
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: Number(process.env.UPLOAD_MAX_SIZE_BYTES ?? 5 * 1024 * 1024) },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Unggah surat izin/sakit dengan validasi keamanan' })
   upload(

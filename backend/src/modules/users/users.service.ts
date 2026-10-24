@@ -7,9 +7,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
-import { Prisma } from '@prisma/client';
+import { ActiveStatus, Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class UsersService {
@@ -114,8 +113,8 @@ export class UsersService {
       throw new ConflictException(`Email ${dto.email} sudah terdaftar.`);
     }
 
-    const plainPassword = dto.password || randomBytes(8).toString('hex');
-    const passwordHash = await bcrypt.hash(plainPassword, 10);
+    await this.validateRoleAssignment(dto.role, dto.kelasId ?? null);
+    const passwordHash = await bcrypt.hash(dto.password, Number(process.env.BCRYPT_ROUNDS ?? 12));
 
     const user = await this.prisma.user.create({
       data: {
@@ -144,7 +143,7 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    await this.findOne(id);
+    const current = await this.findOne(id);
 
     if (dto.email) {
       const emailConflict = await this.prisma.user.findFirst({
@@ -159,6 +158,12 @@ export class UsersService {
       }
     }
 
+    await this.validateRoleAssignment(
+      dto.role ?? current.role,
+      dto.kelasId === undefined ? current.kelasId : dto.kelasId,
+      id,
+    );
+
     const data: Prisma.UserUpdateInput = {};
     if (dto.nama !== undefined) data.nama = dto.nama.trim();
     if (dto.email !== undefined) data.email = dto.email.toLowerCase().trim();
@@ -166,48 +171,34 @@ export class UsersService {
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.kelasId !== undefined) data.kelasAsLeader = dto.kelasId ? { connect: { id: dto.kelasId } } : { disconnect: true };
     if (dto.password) {
-      data.passwordHash = await bcrypt.hash(dto.password, 10);
+      data.passwordHash = await bcrypt.hash(dto.password, Number(process.env.BCRYPT_ROUNDS ?? 12));
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        email: true,
-        nama: true,
-        role: true,
-        status: true,
-        kelasId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          email: true,
+          nama: true,
+          role: true,
+          status: true,
+          kelasId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (dto.password || dto.status === ActiveStatus.inactive) {
+        await tx.session.deleteMany({ where: { userId: id } });
+      }
+      return user;
     });
 
     return {
       ...updated,
       active: updated.status === 'active',
-    };
-  }
-
-  async resetPassword(id: string) {
-    await this.findOne(id);
-    const tempPassword = randomBytes(6).toString('hex');
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
-
-    await this.prisma.user.update({
-      where: { id },
-      data: { passwordHash },
-    });
-
-    // Invalidate existing sessions for security
-    await this.prisma.session.deleteMany({
-      where: { userId: id },
-    });
-
-    return {
-      accepted: true,
-      temporaryPassword: tempPassword,
     };
   }
 
@@ -217,5 +208,25 @@ export class UsersService {
       where: { id },
     });
     return { success: true };
+  }
+
+  private async validateRoleAssignment(role: Role, kelasId: string | null, excludeUserId?: string) {
+    if (role === Role.KETUA_KELAS && !kelasId) {
+      throw new ConflictException('Akun Ketua Kelas harus ditugaskan ke satu kelas.');
+    }
+    if (role !== Role.KETUA_KELAS && kelasId) {
+      throw new ConflictException('Hanya akun Ketua Kelas yang dapat ditugaskan ke kelas.');
+    }
+    if (!kelasId) return;
+
+    const kelas = await this.prisma.class.findUnique({ where: { id: kelasId }, select: { status: true } });
+    if (!kelas || kelas.status !== ActiveStatus.active) {
+      throw new ConflictException('Ketua Kelas harus ditugaskan ke kelas yang aktif.');
+    }
+    const existingLeader = await this.prisma.user.findFirst({
+      where: { kelasId, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
+      select: { id: true },
+    });
+    if (existingLeader) throw new ConflictException('Kelas ini sudah memiliki akun Ketua Kelas.');
   }
 }

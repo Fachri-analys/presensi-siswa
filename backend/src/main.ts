@@ -15,7 +15,7 @@ async function bootstrap() {
   });
 
   const config = app.get(ConfigService);
-  const port = config.get<number>('app.port', 3000);
+  const port = config.get<number>('app.port', 4000);
   const nodeEnv = config.get<string>('app.nodeEnv', 'development');
   const corsOrigins = config.get<string[]>('app.corsOrigins', []);
 
@@ -34,10 +34,10 @@ async function bootstrap() {
 
   // CORS — whitelist origin frontend
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id'],
   });
 

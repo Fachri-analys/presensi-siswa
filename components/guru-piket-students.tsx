@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import { addDemoActivity } from "@/lib/activity-log";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents, updateDemoStudents, type DemoStudent } from "@/lib/demo-students";
-import { getClasses } from "@/lib/mock";
+import type { SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { useRole } from "@/components/app-shell";
 import { createApiSchoolRepository } from "@/lib/data/api-school";
 import { apiErrorMessage } from "@/lib/data/api-client";
@@ -14,11 +12,12 @@ import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 const PAGE_SIZE = 10;
 const CELL = "px-4 py-3";
 type StudentStatus = "active" | "inactive";
-type ManagedStudent = DemoStudent;
+type ManagedStudent = SchoolStudent;
 type PendingAction = { kind: "deactivate" | "activate" | "delete"; student: ManagedStudent } | null;
 
-const classes = getClasses();
-const className = (id: string) => classes.find((item) => item.id === id)?.nama ?? "—";
+function getClassName(classes: SchoolClass[], id: string) {
+  return classes.find((item) => item.id === id)?.nama ?? "—";
+}
 
 export function GuruPiketStudents({
   fixedClassId,
@@ -27,7 +26,8 @@ export function GuruPiketStudents({
 }) {
   const { role } = useRole();
   const isAdmin = role === "ADMIN";
-  const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
+  const [students, setStudents] = useState<ManagedStudent[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | StudentStatus>("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -37,6 +37,19 @@ export function GuruPiketStudents({
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    const repo = createApiSchoolRepository();
+    if (!repo) { setToast("Backend belum dikonfigurasi."); return; }
+    try {
+      const [studentsPage, classesPage] = await Promise.all([
+        repo.listStudents({ limit: 100, kelasId: fixedClassId, status: isAdmin ? "all" : "active" }),
+        repo.listClasses(),
+      ]);
+      setStudents(studentsPage.items); setClasses(classesPage.items);
+    } catch (err: unknown) { setToast(`Gagal memuat data: ${apiErrorMessage(err)}`); }
+  }, [fixedClassId, isAdmin]);
+
+  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
 
   useEffect(() => {
     if (!toast) return;
@@ -50,9 +63,9 @@ export function GuruPiketStudents({
       (isAdmin || student.status === "active") &&
       (statusFilter === "all" || student.status === statusFilter) &&
       (fixedClassId ? student.kelasId === fixedClassId : classFilter === "all" || student.kelasId === classFilter) &&
-      (!search || `${student.nis} ${student.nama} ${className(student.kelasId)}`.toLowerCase().includes(search))
+      (!search || `${student.nis} ${student.nama} ${getClassName(classes, student.kelasId)}`.toLowerCase().includes(search))
     );
-  }, [students, query, statusFilter, classFilter, fixedClassId, isAdmin]);
+  }, [students, classes, query, statusFilter, classFilter, fixedClassId, isAdmin]);
   const current = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
   const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
@@ -65,6 +78,7 @@ export function GuruPiketStudents({
     }
     const { student, kind } = pending;
     const schoolRepo = createApiSchoolRepository();
+    if (!schoolRepo) { setToast("Backend belum dikonfigurasi."); setPending(null); return; }
 
     if (kind === "delete") {
       if (schoolRepo) {
@@ -76,8 +90,7 @@ export function GuruPiketStudents({
           return;
         }
       }
-      updateDemoStudents((previous) => previous.filter((item) => item.id !== student.id));
-      addDemoActivity("Data siswa dihapus", `Admin menghapus data ${student.nama} (${student.nis}) dari daftar siswa.`);
+      await refresh();
       setToast(`Data ${student.nama} berhasil dihapus.`);
     } else {
       const nextStatus: StudentStatus = kind === "deactivate" ? "inactive" : "active";
@@ -90,11 +103,7 @@ export function GuruPiketStudents({
           return;
         }
       }
-      updateDemoStudents((previous) => previous.map((item) => item.id === student.id ? { ...item, status: nextStatus } : item));
-      addDemoActivity(
-        nextStatus === "inactive" ? "Data siswa dinonaktifkan" : "Data siswa diaktifkan kembali",
-        `Admin mengubah data ${student.nama} (${student.nis}) menjadi ${nextStatus === "inactive" ? "nonaktif sehingga tidak masuk daftar presensi aktif" : "aktif kembali"}.`
-      );
+      await refresh();
       setToast(`${student.nama} ${nextStatus === "inactive" ? "dinonaktifkan" : "diaktifkan kembali"}.`);
     }
     setPending(null);
@@ -127,6 +136,7 @@ export function GuruPiketStudents({
     }
 
     const schoolRepo = createApiSchoolRepository();
+    if (!schoolRepo) { setFormError("Backend belum dikonfigurasi."); return; }
 
     if (editing) {
       if (schoolRepo) {
@@ -137,25 +147,18 @@ export function GuruPiketStudents({
           return;
         }
       }
-      updateDemoStudents((previous) => previous.map((student) =>
-        student.id === editing.id ? { ...student, nis, nama, kelasId } : student
-      ));
-      addDemoActivity("Data siswa diperbarui", `Admin memperbarui data ${nama} (${nis}).`);
+      await refresh();
       setToast(`Data ${nama} berhasil diperbarui.`);
     } else {
-      let createdId = `s-${nis}`;
       if (schoolRepo) {
         try {
-          const res = await schoolRepo.createStudent({ nis, nama, kelasId });
-          if (res?.id) createdId = res.id;
+          await schoolRepo.createStudent({ nis, nama, kelasId });
         } catch (err: unknown) {
           setFormError(`Gagal menambahkan siswa: ${apiErrorMessage(err)}`);
           return;
         }
       }
-      const newStudent: ManagedStudent = { id: createdId, nis, nama, kelasId, status: "active" };
-      updateDemoStudents((previous) => [newStudent, ...previous]);
-      addDemoActivity("Data siswa ditambahkan", `Admin menambahkan ${nama} (${nis}) ke kelas ${className(kelasId)}.`);
+      await refresh();
       setToast(`Data ${nama} berhasil ditambahkan.`);
     }
     setShowForm(false);
@@ -168,7 +171,7 @@ export function GuruPiketStudents({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">{fixedClassId ? `Siswa ${className(fixedClassId)}` : "Data Siswa"}</h1>
+        <h1 className="text-2xl font-semibold">{fixedClassId ? `Siswa ${getClassName(classes, fixedClassId)}` : "Data Siswa"}</h1>
         <p className="mt-1 text-sm text-muted">
           {isAdmin
             ? "Admin dapat mengelola data siswa di semua kelas."
@@ -223,7 +226,7 @@ export function GuruPiketStudents({
                   <tr key={student.id} className="hover:bg-canvas">
                     <td className={`${CELL} tabular-nums`}>{student.nis}</td>
                     <td className={`${CELL} font-semibold`}>{student.nama}</td>
-                    <td className={CELL}>{className(student.kelasId)}</td>
+                    <td className={CELL}>{getClassName(classes, student.kelasId)}</td>
                     {isAdmin && <td className={CELL}><Badge tone={student.status === "active" ? "success" : "neutral"}>{student.status === "active" ? "Aktif" : "Nonaktif"}</Badge></td>}
                     {isAdmin && <td className={CELL}>
                       <div className="flex flex-wrap gap-1">
@@ -260,7 +263,7 @@ export function GuruPiketStudents({
       </Dialog>}
 
       {isAdmin && <Dialog open={Boolean(deleteDialog)} title="Hapus data siswa?" onClose={() => setPending(null)}>
-        <p className="mt-2 text-sm text-muted">Data <strong>{pending?.student.nama}</strong> akan dihapus dari daftar ini dan tidak bisa dipulihkan dari tampilan mock.</p>
+        <p className="mt-2 text-sm text-muted">Data <strong>{pending?.student.nama}</strong> akan dihapus dari backend.</p>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={() => setPending(null)} className={btn.outline}>Batal</button>
           <button type="button" onClick={completeAction} className={btn.danger}>Hapus data</button>

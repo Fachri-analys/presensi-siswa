@@ -13,7 +13,7 @@ const PROTECTED_PREFIXES = [
   "/pengaturan",
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get("presensi_session")?.value;
 

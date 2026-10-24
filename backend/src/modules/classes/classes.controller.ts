@@ -15,6 +15,9 @@ import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { SessionUser } from '../../common/types/session-user.type';
+import { AssignClassLeaderDto } from './dto/assign-class-leader.dto';
 
 @ApiTags('Classes')
 @ApiCookieAuth('session')
@@ -25,15 +28,15 @@ export class ClassesController {
   @Get()
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
   @ApiOperation({ summary: 'Daftar semua kelas' })
-  findAll() {
-    return this.classesService.findAll();
+  findAll(@CurrentUser() user: SessionUser) {
+    return this.classesService.findAll(user);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
   @ApiOperation({ summary: 'Detail kelas' })
-  findOne(@Param('id') id: string) {
-    return this.classesService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: SessionUser) {
+    return this.classesService.findOne(id, user);
   }
 
   @Post()
@@ -55,9 +58,9 @@ export class ClassesController {
   @ApiOperation({ summary: 'Tetapkan Ketua Kelas (Hanya Admin)' })
   assignLeader(
     @Param('id') id: string,
-    @Body('leaderUserId') leaderUserId: string | null,
+    @Body() dto: AssignClassLeaderDto,
   ) {
-    return this.classesService.assignLeader(id, leaderUserId);
+    return this.classesService.assignLeader(id, dto.leaderUserId);
   }
 
   @Delete(':id')

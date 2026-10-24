@@ -7,6 +7,7 @@ import type {
   PaginationQuery,
   SchoolAccount,
   SchoolTeacher,
+  UpdateAccountInput,
 } from "./contracts";
 import { decodeAccount, decodePage, decodeTeacher } from "./decoders";
 
@@ -109,7 +110,7 @@ export function createApiAdminRepository(fetcher?: typeof fetch): AdminRepositor
       );
     },
 
-    async updateAccount(id: string, input: CreateAccountInput, signal?: AbortSignal): Promise<SchoolAccount> {
+    async updateAccount(id: string, input: UpdateAccountInput, signal?: AbortSignal): Promise<SchoolAccount> {
       return request(
         `users/${encodeURIComponent(id)}`,
         {
@@ -141,20 +142,6 @@ export function createApiAdminRepository(fetcher?: typeof fetch): AdminRepositor
           signal,
         },
         () => undefined,
-      );
-    },
-
-    async requestPasswordReset(userId: string, signal?: AbortSignal): Promise<{ accepted: boolean }> {
-      return request(
-        `users/${encodeURIComponent(userId)}/reset-password`,
-        {
-          method: "POST",
-          signal,
-        },
-        (val: unknown) => {
-          const res = val as { accepted?: boolean };
-          return { accepted: Boolean(res?.accepted) };
-        },
       );
     },
   };

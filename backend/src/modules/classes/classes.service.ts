@@ -2,15 +2,18 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
-import { ActiveStatus } from '@prisma/client';
+import { ActiveStatus, Role } from '@prisma/client';
+import type { SessionUser } from '../../common/types/session-user.type';
+import { assertClassAccess } from '../../common/utils/access-control.util';
 
 @Injectable()
 export class ClassesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(user: SessionUser) {
     // Eager loading leader dan count students untuk mencegah N+1 query
     const classes = await this.prisma.class.findMany({
+      where: user.role === Role.KETUA_KELAS ? { id: user.kelasId ?? '' } : undefined,
       orderBy: { nama: 'asc' },
       include: {
         leader: {
@@ -38,7 +41,8 @@ export class ClassesService {
     }));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: SessionUser) {
+    if (user) assertClassAccess(user, id);
     const item = await this.prisma.class.findUnique({
       where: { id },
       include: {
@@ -114,16 +118,16 @@ export class ClassesService {
       if (!user) {
         throw new NotFoundException(`User dengan ID "${leaderUserId}" tidak ditemukan.`);
       }
+      if (user.role !== Role.KETUA_KELAS || user.status !== ActiveStatus.active) {
+        throw new ConflictException('Ketua kelas harus memakai akun Ketua Kelas yang aktif.');
+      }
+      if (user.kelasId && user.kelasId !== kelasId) {
+        throw new ConflictException('Akun Ketua Kelas sudah ditugaskan ke kelas lain.');
+      }
 
-      // Lepaskan user jika sebelumnya menjadi leader di kelas lain
-      await this.prisma.user.updateMany({
-        where: { kelasId, id: { not: leaderUserId } },
-        data: { kelasId: null },
-      });
-
-      await this.prisma.user.update({
-        where: { id: leaderUserId },
-        data: { kelasId },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.updateMany({ where: { kelasId, id: { not: leaderUserId } }, data: { kelasId: null } });
+        await tx.user.update({ where: { id: leaderUserId }, data: { kelasId } });
       });
     } else {
       await this.prisma.user.updateMany({

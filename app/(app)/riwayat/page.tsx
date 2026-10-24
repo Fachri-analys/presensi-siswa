@@ -1,56 +1,69 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRole } from "@/components/app-shell";
 import { RoleGate } from "@/components/role-gate";
 import { btn, card, EmptyState, field, Pagination } from "@/components/ui";
-import { getClasses, getHistory, getClass } from "@/lib/mock";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import { apiErrorMessage } from "@/lib/data/api-client";
+import type { SchoolClass } from "@/lib/data/contracts";
 import { currentMonthRange, isValidDateRange, pct } from "@/lib/stats";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceHistory, subscribeToDemoAttendance } from "@/lib/demo-attendance";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import type { HistoryRow } from "@/lib/data/contracts";
 
 const PAGE_SIZE = 10;
 const CELL = "px-4 py-3";
-const classes = getClasses();
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 function RiwayatContent() {
   const { role, kelasId: sessionClassId } = useRole();
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("kelas");
-  const defaultClassId = sessionClassId ?? classes[0]?.id ?? "xi-pplg-1";
-  const initialClassId = classes.some((kelas) => kelas.id === requestedClassId) ? requestedClassId! : defaultClassId;
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const defaultClassId = sessionClassId ?? "";
   const [period] = useState(currentMonthRange);
-  const [kelasId, setKelasId] = useState(initialClassId);
+  const [kelasId, setKelasId] = useState("");
   const [from, setFrom] = useState(period.from);
   const [to, setTo] = useState(period.to);
   const invalidDateRange = !isValidDateRange(from, to);
   const [page, setPage] = useState(1);
-  const [apiHistory, setApiHistory] = useState<HistoryRow[] | null>(null);
-  const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
-  const students = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
+  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [activeStudentCount, setActiveStudentCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const repo = createApiSchoolRepository();
+      if (!repo) { setError("Backend belum dikonfigurasi."); return; }
+      return repo.listClasses().then((page) => {
+        setClasses(page.items);
+        const selected = page.items.find((item) => item.id === requestedClassId)?.id ?? sessionClassId ?? page.items[0]?.id ?? "";
+        setKelasId(selected);
+      }).catch((err: unknown) => setError(apiErrorMessage(err)));
+    });
+  }, [requestedClassId, sessionClassId]);
 
   // Ketua Kelas dikunci ke kelasnya; Guru Piket bebas memilih.
   const activeId = role === "KETUA_KELAS" ? (sessionClassId ?? defaultClassId) : kelasId;
-  const kelas = getClass(activeId);
+  const kelas = classes.find((item) => item.id === activeId);
 
   useEffect(() => {
     let active = true;
     async function loadHistory() {
+      await Promise.resolve();
+      if (!active) return;
       const repo = createApiAttendanceRepository();
       if (!repo || !activeId || !from || !to || invalidDateRange) {
-        if (active) setApiHistory(null);
+        if (active) setRows([]);
         return;
       }
       try {
         const history = await repo.getHistory({ kelasId: activeId, from, to });
-        if (active) setApiHistory(history);
-      } catch {
-        if (active) setApiHistory(null);
+        if (active) { setRows(history); setError(null); }
+      } catch (err: unknown) {
+        if (active) { setRows([]); setError(apiErrorMessage(err)); }
       }
     }
     void loadHistory();
@@ -59,11 +72,14 @@ function RiwayatContent() {
     };
   }, [activeId, from, to, invalidDateRange]);
 
-  const storedRows = apiHistory ?? getStoredAttendanceHistory(attendanceStore, activeId, from, to);
-  const activeStudentCount = storedRows.length
-    ? students.filter((student) => student.kelasId === activeId && student.status === "active").length
-    : kelas?.siswa ?? 0;
-  const rows = storedRows.length ? storedRows : getHistory(activeId, from, to);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const repo = createApiSchoolRepository();
+      if (!repo || !activeId) { setActiveStudentCount(0); return; }
+      return repo.listStudents({ kelasId: activeId, status: "active", limit: 1 }).then((page) => setActiveStudentCount(page.total)).catch((err: unknown) => setError(apiErrorMessage(err)));
+    });
+  }, [activeId]);
+
   const current = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const visible = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   const totalFor = (key: "hadir" | "izin" | "sakit" | "alpa" | "terlambat") => rows.reduce((sum, row) => sum + row[key], 0);
@@ -77,18 +93,12 @@ function RiwayatContent() {
           <div>
             <h1 className="text-2xl font-semibold">Riwayat Presensi</h1>
             <p className="mt-1 text-sm text-muted">
-              {storedRows.length
-                ? "Menampilkan presensi yang tersimpan untuk kelas dan periode ini."
-                : "Belum ada presensi tersimpan pada periode ini; contoh data ditampilkan sebagai pratinjau."}
+              Menampilkan presensi yang tersimpan untuk kelas dan periode ini.
             </p>
           </div>
           {kelas && <p className="rounded-full bg-primary-soft px-3 py-1 text-sm font-semibold text-primary">{kelas.nama}</p>}
         </div>
-        {!invalidDateRange && !storedRows.length && (
-          <p role="note" className="rounded-md border border-warning px-4 py-3 text-sm font-semibold text-warning">
-            Data contoh, bukan data resmi
-          </p>
-        )}
+        {error && <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">Gagal memuat riwayat: {error}</p>}
 
         <section aria-label="Ringkasan riwayat" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[

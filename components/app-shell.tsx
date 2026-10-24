@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Activity, ClipboardCheck, FileText, History, LayoutDashboard, LogOut, Menu, School, SlidersHorizontal, Users, X, type LucideIcon } from "lucide-react";
-import { addDemoActivity } from "@/lib/activity-log";
-import { clearDemoSession } from "@/lib/demo-session";
 import type { SessionUser } from "@/lib/data/contracts";
 import type { Role } from "@/lib/types";
 import { Logo } from "./logo";
@@ -48,7 +46,7 @@ export function useRole() {
 }
 
 /**
- * Role tersimpan hanya untuk simulasi; otorisasi produksi harus berasal dari sesi server.
+ * Hak akses dan identitas berasal dari sesi server.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -125,7 +123,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   async function logout() {
-    addDemoActivity("Keluar dari aplikasi", `${ROLES[role].label} keluar dari sistem presensi.`);
     const authRepo = createApiAuthRepository();
     if (authRepo) {
       try {
@@ -134,7 +131,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         console.warn("Gagal logout dari server backend:", err);
       }
     }
-    clearDemoSession();
     setSessionUser(null);
     setOpen(false);
     router.replace("/login");
@@ -233,10 +229,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p suppressHydrationWarning className="hidden text-sm text-muted lg:block">{today}</p>
           </div>
           <div className="flex items-center gap-6">
-            <p className="hidden items-center gap-2 text-xs font-medium text-muted lg:flex">
-              <span className="size-2 rounded-full bg-warning" aria-hidden />
-              Data simulasi
-            </p>
             <div className="hidden size-10 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary sm:grid">
               {sessionUser?.nama ? sessionUser.nama.slice(0, 2).toUpperCase() : ROLES[role].initials}
             </div>

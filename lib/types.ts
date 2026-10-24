@@ -44,10 +44,7 @@ export interface RecapRow {
 
 export const ROLE_LABEL: Record<Role, string> = { KETUA_KELAS: "Ketua Kelas", GURU_PIKET: "Guru Piket", ADMIN: "Admin" };
 
-// Dipakai ManageTable: harus `type` (bukan interface) agar kompatibel dengan Record<string, string>.
 export type StudentRow = { id: string; nis: string; nama: string; kelasId: string };
-export type KelasRow = { id: string; nama: string; jurusan: string; ketua: string };
-export type AccountRow = { id: string; nama: string; email: string; role: Role; kelasId: string };
 export type HistoryRow = { date: string; hadir: number; izin: number; sakit: number; alpa: number; terlambat: number };
 
 export interface AuditEntry {

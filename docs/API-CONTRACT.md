@@ -22,7 +22,7 @@ Dokumen ini merupakan spesifikasi API backend resmi yang diimplementasikan pada 
 
 ### Sesi cookie
 
-Usulan memakai cookie sesi `HttpOnly`, `Secure` di produksi, dan `SameSite` yang sesuai deployment. Frontend sudah mengirim `credentials: "include"`. Backend/frontend harus menyepakati origin, CORS, CSRF, durasi idle/absolut sesi, rotasi sesi, serta perilaku logout.
+Backend menggunakan cookie sesi `HttpOnly`, `Secure` di produksi, CORS allowlist dengan credentials, dan pemeriksaan `Origin` untuk request yang mengubah data. Frontend mengirim `credentials: "include"`. Domain deployment, SameSite, durasi sesi, rotasi, dan perilaku logout tetap perlu disesuaikan dengan lingkungan sekolah.
 
 Jangan menyimpan token akses rahasia ke `localStorage`. Password hanya dikirim melalui koneksi TLS pada login dan tidak pernah dikembalikan.
 
@@ -143,19 +143,17 @@ Contoh:
 
 NIS/NIP tidak boleh berubah menjadi ID otorisasi. Server harus memvalidasi keunikan, normalisasi, dan relasi kelas.
 
-### Akun dan reset password
+### Akun
 
 | Method | Path | Kegunaan |
 |---|---|---|
 | `GET` | `/users?search=&role=&status=&cursor=&limit=` | Admin membaca akun |
 | `POST` | `/users` | Admin membuat akun |
 | `PATCH` | `/users/{userId}` | Admin mengubah profil/role/cakupan yang diizinkan |
-| `POST` | `/users/{userId}/deactivate` | Admin menonaktifkan akun |
-| `POST` | `/users/{userId}/activate` | Admin mengaktifkan akun |
+| `PATCH` | `/users/{userId}` | Admin mengubah status akun |
 | `DELETE` | `/users/{userId}` | Admin meminta penghapusan sesuai kebijakan |
-| `POST` | `/users/{userId}/password-reset` | Admin memulai alur reset aman |
 
-Reset mengembalikan status permintaan saja, contohnya `{ "accepted": true }`; tidak mengembalikan password/token reset yang dapat digunakan. Pengiriman tautan/token harus menggunakan kanal aman yang disepakati sekolah.
+Pembuatan akun mewajibkan password awal minimal 12 karakter. Admin dapat mengganti password melalui `PATCH /users/{userId}`; penggantian menghapus seluruh sesi akun tersebut. Endpoint reset yang mengembalikan password sementara tidak tersedia.
 
 Data pembuatan akun dan kaitannya dengan entitas Guru/Siswa perlu diputuskan. Jangan otomatis membuat akun siswa per orang tanpa persetujuan produk; kebutuhan saat ini menyebut Ketua Kelas sebagai akun petugas kelas.
 
@@ -164,9 +162,10 @@ Data pembuatan akun dan kaitannya dengan entitas Guru/Siswa perlu diputuskan. Ja
 | Method | Path | Kegunaan |
 |---|---|---|
 | `GET` | `/attendance?kelasId=&date=YYYY-MM-DD` | Baca presensi kelas/tanggal |
-| `PUT` | `/attendance/classes/{classId}/dates/{date}` | Simpan batch presensi kelas/tanggal |
+| `POST` | `/attendance/batch` | Simpan batch presensi kelas/tanggal |
 | `PATCH` | `/attendance/{attendanceId}` | Koreksi satu catatan |
 | `DELETE` | `/attendance/{attendanceId}` | Hapus catatan presensi (bukan siswa) |
+| `POST` | `/attendance/permissions` | Guru Piket/Admin memberi izin hadir satu kali per siswa |
 
 Contoh batch:
 
@@ -230,9 +229,9 @@ Sepakati batas maksimum `limit`, urutan stabil, perilaku pencarian, dan apakah `
 3. `studentId` atau NIS pada foreign key presensi.
 4. Semantik PUT batch, idempotency key, duplikasi, dan update bersamaan (misalnya ETag/version).
 5. Cursor pagination, sorting, filter, dan nilai maksimum limit.
-6. Cookie/session, domain, SameSite, CSRF, CORS, durasi dan pembatalan sesi.
+6. Cookie/session, domain, SameSite, CORS, durasi dan pembatalan sesi.
 7. Bentuk error final, `requestId`, field validation, dan pemetaan ke pesan pengguna.
-8. Kebijakan penghapusan, audit log, reset password, hari efektif, kalender libur, zona waktu.
+8. Kebijakan penghapusan, audit log, reset mandiri password, hari efektif, kalender libur, zona waktu.
 9. Apakah laporan/ekspor diproses di frontend atau server.
 10. Apakah status presensi perlu diperluas dengan `DISPENSASI`; status itu belum didukung frontend dan tidak boleh ditambahkan tanpa keputusan produk.
 11. Bentuk resource jadwal sesi pagi/siang yang dapat dibaca semua role terkait dan diubah Admin, aturan zona `Asia/Jakarta`, serta cara Guru Piket memberi izin `HADIR`/`TERLAMBAT` satu kali per siswa/tanggal. Backend wajib memvalidasi jam/lock dan izin pada setiap simpan, mengonsumsi izin secara atomik, dan mencatat perubahan jadwal/izin di audit log.

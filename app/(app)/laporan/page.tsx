@@ -1,21 +1,19 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { btn, card, EmptyState, field } from "@/components/ui";
-import { getClasses, getRecap } from "@/lib/mock";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import { apiErrorMessage } from "@/lib/data/api-client";
+import type { SchoolClass } from "@/lib/data/contracts";
 import { currentMonthRange, isValidDateRange, pct, workDays } from "@/lib/stats";
 import { STATUS_LABEL, type Status } from "@/lib/types";
 import { useRole } from "@/components/app-shell";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getStoredAttendanceRecap, subscribeToDemoAttendance } from "@/lib/demo-attendance";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
 import { SemesterAttendanceStats } from "@/components/semester-attendance-stats";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import type { AttendanceReport } from "@/lib/data/contracts";
 
-const classes = getClasses();
-const jurusanList = [...new Set(classes.map((c) => c.jurusan))];
 const STATUS_KEY: Record<Status, CountKey> = { HADIR: "hadir", TERLAMBAT: "terlambat", IZIN: "izin", SAKIT: "sakit", ALPA: "alpa" };
 const TOTAL_KEYS = ["hadir", "izin", "sakit", "alpa", "terlambat"] as const;
 type CountKey = (typeof TOTAL_KEYS)[number];
@@ -26,9 +24,10 @@ function Filter({ label, children }: { label: string; children: React.ReactNode 
 
 export default function LaporanPage() {
   const { role, kelasId: sessionClassId } = useRole();
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [period] = useState(currentMonthRange);
   const [jurusan, setJurusan] = useState("");
-  const [kelasId, setKelasId] = useState(classes[0].id);
+  const [kelasId, setKelasId] = useState(sessionClassId ?? "");
   const [from, setFrom] = useState(period.from);
   const [to, setTo] = useState(period.to);
   const [status, setStatus] = useState<Status | "">("");
@@ -37,18 +36,29 @@ export default function LaporanPage() {
   const [exportError, setExportError] = useState(false);
   const [activeTab, setActiveTab] = useState<"periode" | "semester">("periode");
   const [apiReport, setApiReport] = useState<AttendanceReport | null>(null);
-  const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
-  const demoStudents = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
+  const [error, setError] = useState<string | null>(null);
+  const jurusanList = [...new Set(classes.map((c) => c.jurusan))];
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const repo = createApiSchoolRepository();
+      if (!repo) { setError("Backend belum dikonfigurasi."); return; }
+      return repo.listClasses().then((page) => { setClasses(page.items); setKelasId((current) => current || sessionClassId || page.items[0]?.id || ""); }).catch((err: unknown) => setError(apiErrorMessage(err)));
+    });
+  }, [sessionClassId]);
 
   const visibleClasses = role === "KETUA_KELAS" ? classes.filter((c) => sessionClassId ? c.id === sessionClassId : true) : classes;
   const options = visibleClasses.filter((c) => !jurusan || c.jurusan === jurusan);
-  const kelas = options.find((c) => c.id === kelasId) ?? options[0];
+  const kelas = options.find((c) => c.id === kelasId) ?? options[0] ?? null;
   const days = workDays(from, to);
   const invalidDateRange = !isValidDateRange(from, to);
 
   useEffect(() => {
     let active = true;
     async function loadReport() {
+      await Promise.resolve();
+      if (!active) return;
+      setApiReport(null);
       const repo = createApiAttendanceRepository();
       if (!repo || !kelas?.id || !from || !to || invalidDateRange) {
         if (active) setApiReport(null);
@@ -56,9 +66,9 @@ export default function LaporanPage() {
       }
       try {
         const report = await repo.getReport({ kelasId: kelas.id, from, to, status: status || undefined });
-        if (active) setApiReport(report);
-      } catch {
-        if (active) setApiReport(null);
+        if (active) { setApiReport(report); setError(null); }
+      } catch (err: unknown) {
+        if (active) { setApiReport(null); setError(apiErrorMessage(err)); }
       }
     }
     void loadReport();
@@ -67,14 +77,12 @@ export default function LaporanPage() {
     };
   }, [kelas?.id, from, to, status, invalidDateRange]);
 
-  const storedRecap = getStoredAttendanceRecap(attendanceStore, kelas.id, from, to, demoStudents);
-  const isExampleData = !apiReport && storedRecap === null;
-  const reportDays = apiReport?.effectiveDays ?? storedRecap?.days ?? days;
-  const rows = (apiReport?.rows ?? storedRecap?.rows ?? getRecap(kelas.id, days)).filter((r) => !status || r[STATUS_KEY[status]] > 0);
+  const reportDays = apiReport?.effectiveDays ?? days;
+  const rows = (apiReport?.rows ?? []).filter((r) => !status || r[STATUS_KEY[status]] > 0);
   const total = (key: CountKey) => rows.reduce((sum, r) => sum + r[key], 0);
   const overall = pct(total("hadir"), reportDays * rows.length);
-  const daysLabel = apiReport || storedRecap ? "hari presensi tercatat" : "hari kerja";
-  const ready = days > 0 && rows.length > 0;
+  const daysLabel = "hari presensi tercatat";
+  const ready = Boolean(apiReport) && days > 0 && rows.length > 0;
   const th = "border border-line px-2 py-2 text-center";
   const td = "border border-line px-2 py-2 text-center";
 
@@ -143,7 +151,7 @@ export default function LaporanPage() {
       sheet.mergeCells("C6:F6");
       sheet.getCell("C6").value = `${longDate(from)} - ${longDate(to)}`;
       sheet.mergeCells("G6:H6");
-      sheet.getCell("G6").value = storedRecap ? "Hari tercatat" : "Hari kerja";
+      sheet.getCell("G6").value = "Hari tercatat";
       sheet.mergeCells("I6:J6");
       sheet.getCell("I6").value = reportDays;
       sheet.mergeCells("A7:B7");
@@ -271,6 +279,8 @@ export default function LaporanPage() {
     }
   }
 
+  if (!kelas) return <div className="space-y-4"><h1 className="text-2xl font-semibold">Laporan Presensi</h1>{error ? <p role="alert" className="text-sm text-danger">Gagal memuat kelas: {error}</p> : <EmptyState title="Belum ada kelas" description="Kelas dari backend akan muncul di sini." />}</div>;
+
   return (
     <div className="space-y-6">
       <style>{`@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 14mm 14mm 18mm; }`}</style>
@@ -344,10 +354,10 @@ export default function LaporanPage() {
           </select>
         </Filter>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-          <button type="button" disabled={!ready || isExampleData} onClick={() => window.print()} className={btn.primary}>
+          <button type="button" disabled={!ready} onClick={() => window.print()} className={btn.primary}>
             <Download size={16} aria-hidden /> Download PDF
           </button>
-          <button type="button" disabled={!ready || isExampleData || exporting} onClick={exportExcel} className={btn.outline}>
+          <button type="button" disabled={!ready || exporting} onClick={exportExcel} className={btn.outline}>
             <FileSpreadsheet size={16} aria-hidden /> {exporting ? "Menyiapkan Excel…" : "Download Excel"}
           </button>
           <p className="text-xs text-muted">Untuk PDF, pilih “Simpan sebagai PDF” pada dialog cetak yang terbuka.</p>
@@ -360,11 +370,7 @@ export default function LaporanPage() {
         aria-label="Preview laporan"
         className={`mx-auto w-full overflow-x-auto bg-surface p-6 ring-1 ring-line sm:p-8 print:max-w-none print:overflow-visible print:p-0 print:ring-0 ${landscape ? "max-w-[297mm]" : "max-w-[210mm]"}`}
       >
-        {isExampleData && (
-          <p role="note" className="mb-4 rounded-md border border-warning px-4 py-3 text-sm font-semibold text-warning">
-            Data contoh, bukan data resmi
-          </p>
-        )}
+        {error && <p role="alert" className="mb-4 rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">Gagal memuat laporan: {error}</p>}
         {!ready ? (
           <EmptyState title={invalidDateRange ? "Rentang tanggal tidak valid" : "Laporan belum bisa dibuat"} description={invalidDateRange ? "Pilih rentang tanggal yang benar, maksimal 366 hari." : "Pastikan rentang tanggal mencakup hari kerja dan ada siswa yang sesuai filter."} />
         ) : (

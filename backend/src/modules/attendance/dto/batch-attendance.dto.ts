@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsDateString, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsDateString, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AttendanceItemDto } from './attendance-item.dto';
 
@@ -16,6 +16,7 @@ export class BatchAttendanceDto {
   @ApiProperty({ type: [AttendanceItemDto] })
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => AttendanceItemDto)
   records!: AttendanceItemDto[];

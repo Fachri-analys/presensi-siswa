@@ -31,6 +31,6 @@ export class UpdateUserDto {
   @ApiPropertyOptional({ example: 'NewSecret123!' })
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
   password?: string;
 }

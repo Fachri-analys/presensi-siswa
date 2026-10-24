@@ -28,6 +28,8 @@ export interface AttendanceBatch {
   records: Array<Pick<AttendanceRecord, "nis" | "status" | "waktu" | "keterangan">>;
 }
 
+export interface PresentPermissionInput { date: string; kelasId: string; nis: string }
+
 export interface AttendanceHistoryQuery {
   kelasId: string;
   from: string;
@@ -82,6 +84,17 @@ export interface CreateAccountInput {
   email: string;
   role: Role;
   kelasId: string | null;
+  password: string;
+}
+
+export type UpdateAccountInput = Omit<CreateAccountInput, "password"> & { password?: string };
+
+export interface AttendanceSchedule {
+  id: string;
+  session: "PAGI" | "SIANG";
+  mulai: string;
+  selesai: string;
+  terkunci: boolean;
 }
 
 export interface CreateClassInput {
@@ -128,6 +141,7 @@ export interface AttendanceRepository {
   saveClassAttendance(batch: AttendanceBatch, signal?: AbortSignal): Promise<AttendanceRecord[]>;
   updateAttendance(id: string, changes: Pick<AttendanceRecord, "status" | "waktu" | "keterangan">, signal?: AbortSignal): Promise<AttendanceRecord>;
   deleteAttendance(id: string, signal?: AbortSignal): Promise<void>;
+  grantPresentPermission(input: PresentPermissionInput, signal?: AbortSignal): Promise<void>;
   getHistory(query: AttendanceHistoryQuery, signal?: AbortSignal): Promise<HistoryRow[]>;
   getReport(query: AttendanceReportQuery, signal?: AbortSignal): Promise<AttendanceReport>;
 }
@@ -154,10 +168,15 @@ export interface AdminRepository {
   deleteTeacher(id: string, signal?: AbortSignal): Promise<void>;
   listAccounts(query?: PaginationQuery, signal?: AbortSignal): Promise<Page<SchoolAccount>>;
   createAccount(input: CreateAccountInput, signal?: AbortSignal): Promise<SchoolAccount>;
-  updateAccount(id: string, input: CreateAccountInput, signal?: AbortSignal): Promise<SchoolAccount>;
+  updateAccount(id: string, input: UpdateAccountInput, signal?: AbortSignal): Promise<SchoolAccount>;
   setAccountActive(id: string, active: boolean, signal?: AbortSignal): Promise<SchoolAccount>;
   deleteAccount(id: string, signal?: AbortSignal): Promise<void>;
-  requestPasswordReset(userId: string, signal?: AbortSignal): Promise<{ accepted: boolean }>;
+}
+
+export interface ScheduleRepository {
+  listSchedules(signal?: AbortSignal): Promise<AttendanceSchedule[]>;
+  updateSchedule(id: string, input: Pick<AttendanceSchedule, "mulai" | "selesai">, signal?: AbortSignal): Promise<AttendanceSchedule>;
+  toggleScheduleLock(id: string, signal?: AbortSignal): Promise<AttendanceSchedule>;
 }
 
 export interface MonitoringRepository {

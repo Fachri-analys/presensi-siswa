@@ -7,7 +7,6 @@
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](https://www.postgresql.org/)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma%205-2D3748?logo=prisma)](https://www.prisma.io/)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript%205-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-76%20Passed-brightgreen)](https://github.com/Fachri-analys/presensi-siswa)
 
 Sistem Informasi Presensi Siswa terintegrasi berbasis monorepo untuk **SMK Negeri 11 Jakarta**. Dirancang untuk mendigitalkan proses pencatatan kehadiran harian, verifikasi surat izin/sakit dokter, monitoring kehadiran *real-time*, dan rekapitulasi laporan semester otomatis berstandar dinas pendidikan.
 
@@ -75,6 +74,8 @@ npm --prefix backend run prisma:migrate
 npm run backend:prisma:seed
 ```
 
+Seed tidak membuat data contoh. Untuk menyiapkan Admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env` sebelum menjalankan seed. Password minimal 12 karakter.
+
 ### 4. Jalankan Aplikasi
 
 Buka dua terminal terpisah:
@@ -94,13 +95,13 @@ npm run dev
 
 ## 🧪 Pengujian Otomatis & Kualitas Kode
 
-Sistem diverifikasi melalui **76 automated tests** yang terintegrasi pada GitHub Actions CI/CD:
+Pemeriksaan otomatis yang tersedia mencakup test suite, pemeriksaan tipe TypeScript, dan lint:
 
 ```bash
-# Jalankan 40 test frontend (Vitest)
+# Jalankan unit test frontend (Vitest)
 npm test
 
-# Jalankan 36 test backend (Jest)
+# Jalankan unit test backend (Jest)
 npm run backend:test
 
 # Pemeriksaan tipe TypeScript
@@ -112,12 +113,6 @@ npm run lint
 npm --prefix backend run lint
 ```
 
-| Lingkungan | Test Runner | Test Suites | Total Tests | Status |
-|---|---|:---:|:---:|:---:|
-| **Frontend** | Vitest | 13 | 40 | **PASS (100%)** |
-| **Backend** | Jest | 10 | 36 | **PASS (100%)** |
-| **Total** | | **23** | **76** | **PASS (100%)** |
-
 ---
 
 ## 🐳 Deployment Produksi (Docker)
@@ -127,22 +122,22 @@ Aplikasi dilengkapi Dockerfile multi-stage production dengan keamanan non-root u
 ```bash
 # Build dan jalankan backend API
 docker build -t presensi-backend:latest ./backend
-docker run -d --name presensi-api -p 4000:4000 --env-file backend/.env presensi-backend:latest
+docker run -d --name presensi-api --restart unless-stopped -p 4000:4000 --env-file backend/.env -v presensi_uploads:/app/uploads presensi-backend:latest
 
 # Build dan jalankan frontend Web
-docker build -t presensi-frontend:latest .
-docker run -d --name presensi-web -p 3000:3000 --env-file .env.production presensi-frontend:latest
+docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.domain-sekolah.sch.id/api/v1/ -t presensi-frontend:latest .
+docker run -d --name presensi-web --restart unless-stopped -p 3000:3000 presensi-frontend:latest
 ```
+
+Ganti URL contoh dengan origin API HTTPS production. URL API frontend dibenamkan saat build, sedangkan variabel backend harus menunjuk ke database production yang bisa diakses dari container; jangan memakai kredensial contoh. Jalankan `prisma:migrate:deploy` sebelum mengganti image backend. Volume `presensi_uploads` menjaga lampiran surat tetap ada setelah container dibuat ulang. Jalankan satu replica backend selama file masih disimpan di volume lokal; skala horizontal memerlukan storage file dan rate limiter bersama.
 
 ### Backup & Restore Database
 
-```bash
-# Backup database terkompresi
-docker exec -t presensi-postgres pg_dump -U presensi -d presensi_dev --format=custom --blobs | gzip > backup_$(date +%Y%m%d_%H%M%S).dump.gz
+Gunakan backup terjadwal dari penyedia PostgreSQL atau `pg_dump` dengan kredensial dari secret manager. Uji pemulihan hanya ke database staging kosong sebelum merilis; jangan menjalankan restore di database operasional sebagai langkah uji.
 
-# Restore database
-gunzip -c backup_YYYYMMDD_HHMMSS.dump.gz > restore.dump
-docker exec -i presensi-postgres pg_restore -U presensi -d presensi_dev --clean --if-exists restore.dump
+```bash
+pg_dump --host="$PGHOST" --username="$PGUSER" --dbname="$PGDATABASE" --format=custom --file="presensi_$(date +%Y%m%d_%H%M%S).dump"
+pg_restore --host="$STAGING_PGHOST" --username="$STAGING_PGUSER" --dbname="$STAGING_PGDATABASE" --no-owner "presensi_YYYYMMDD_HHMMSS.dump"
 ```
 
 ---
@@ -155,6 +150,7 @@ Dokumentasi spesifikasi teknis dan perancangan sistem tersimpan di direktori [`d
 - **[SRS (Software Requirements Specification)](./docs/SRS.md):** Kebutuhan fungsional & nonfungsional sistem.
 - **[API Contract](./docs/API-CONTRACT.md):** Spesifikasi lengkap endpoint REST API dan skema payload.
 - **[Backend Handoff](./docs/BACKEND-HANDOFF.md):** Arsitektur backend, kontrol keamanan, dan panduan serah terima.
+- **[Peta proyek](./docs/PROJECT-MAP.md):** Struktur repo, route, modul, dan alur data.
 
 ---
 

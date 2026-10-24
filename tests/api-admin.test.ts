@@ -81,6 +81,7 @@ describe("api-admin repository integration", () => {
       email: "guru@sekolah.sch.id",
       role: "GURU_PIKET",
       kelasId: null,
+      password: "KataSandiAwalYgPanjang!",
     });
 
     expect(res.id).toBe("usr-2");
@@ -88,21 +89,4 @@ describe("api-admin repository integration", () => {
     expect(init?.method).toBe("POST");
   });
 
-  it("[INT-ADM-04] requestPasswordReset() memanggil POST /users/:id/reset-password", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ accepted: true }), {
-        headers: { "content-type": "application/json" },
-        status: 200,
-      }),
-    );
-
-    const repo = createApiAdminRepository(fetcher)!;
-    const res = await repo.requestPasswordReset("usr-1");
-
-    expect(res.accepted).toBe(true);
-    expect(fetcher).toHaveBeenCalledWith(
-      expect.objectContaining({ href: "http://localhost:4000/api/v1/users/usr-1/reset-password" }),
-      expect.anything(),
-    );
-  });
 });

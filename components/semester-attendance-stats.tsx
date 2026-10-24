@@ -1,23 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Calendar } from "lucide-react";
-import { getClasses } from "@/lib/mock";
 import {
   SEMESTER_OPTIONS,
-  getSemesterStudentStats,
   computeSemesterSummary,
   type StudentSemesterStat,
 } from "@/lib/semester-stats";
 import { useRole } from "@/components/app-shell";
 import { Badge, card, EmptyState, field, Pagination, StatCard } from "./ui";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
+import { apiErrorMessage } from "@/lib/data/api-client";
+import type { SchoolClass } from "@/lib/data/contracts";
 
 const PAGE_SIZE = 10;
 const CELL = "px-4 py-3";
 
 export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: string }) {
   const { role, kelasId: sessionClassId } = useRole();
-  const classes = getClasses();
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [allStats, setAllStats] = useState<StudentSemesterStat[]>([]);
+  const [effectiveDays, setEffectiveDays] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const isKetuaKelas = role === "KETUA_KELAS";
 
   const defaultClassId = isKetuaKelas ? (sessionClassId ?? "all") : (initialClassId ?? "all");
@@ -31,10 +37,39 @@ export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: s
     [selectedSemester]
   );
 
-  // Ambil data semester berdasarkan filter kelas
-  const allStats = useMemo(() => {
-    return getSemesterStudentStats(selectedSemester, isKetuaKelas ? (sessionClassId ?? selectedClass) : selectedClass);
-  }, [selectedSemester, selectedClass, isKetuaKelas, sessionClassId]);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const school = createApiSchoolRepository();
+      if (!school) { setError("Backend belum dikonfigurasi."); return; }
+      return school.listClasses().then((page) => { setClasses(page.items); setSelectedClass((current) => current === "all" ? defaultClassId : current); }).catch((err: unknown) => setError(apiErrorMessage(err)));
+    });
+  }, [defaultClassId]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      const attendance = createApiAttendanceRepository();
+      if (!attendance) { setError("Backend belum dikonfigurasi."); return; }
+      const semester = SEMESTER_OPTIONS.find((item) => item.id === selectedSemester) ?? SEMESTER_OPTIONS[0];
+      const selectedId = isKetuaKelas ? sessionClassId : selectedClass;
+      const selectedClasses = classes.filter((item) => selectedId === "all" || item.id === selectedId);
+      if (selectedClasses.length === 0) { setAllStats([]); setEffectiveDays(0); return; }
+      setLoading(true);
+      return Promise.all(selectedClasses.map((item) => attendance.getReport({ kelasId: item.id, from: semester.from, to: semester.to })))
+        .then((reports) => {
+          if (!active) return;
+          setEffectiveDays(Math.max(0, ...reports.map((report) => report.effectiveDays)));
+          setAllStats(reports.flatMap((report) => report.rows.map((row) => {
+            const totalKehadiran = row.hadir;
+            const persentase = report.effectiveDays ? Math.round(totalKehadiran / report.effectiveDays * 100) : 0;
+            return { nis: row.nis, nama: row.nama, kelasId: report.kelas.id, kelasNama: report.kelas.nama, hadir: row.hadir, izin: row.izin, sakit: row.sakit, alpa: row.alpa, totalKehadiran, persentase, totalHariEfektif: report.effectiveDays };
+          })));
+          setError(null);
+        }).catch((err: unknown) => { if (active) { setAllStats([]); setError(apiErrorMessage(err)); } })
+        .finally(() => { if (active) setLoading(false); });
+    });
+    return () => { active = false; };
+  }, [classes, selectedSemester, selectedClass, isKetuaKelas, sessionClassId]);
 
   // Hitung summary sebelum filter search agar menggambarkan total keseluruhan kelas/semester
   const summary = useMemo(() => computeSemesterSummary(allStats), [allStats]);
@@ -68,13 +103,9 @@ export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: s
             Akumulasi kehadiran per siswa untuk 1 semester: Hadir, Izin, Sakit, Alpa, dan Total Kehadiran.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge tone="accent">Mock Data</Badge>
-          <span className="text-xs text-muted">
-            {currentSemester.periode} ({currentSemester.totalHariEfektif} hari efektif)
-          </span>
-        </div>
+        <div className="flex items-center gap-2"><Badge tone="info">Data backend</Badge><span className="text-xs text-muted">{currentSemester.periode} ({effectiveDays} hari tercatat)</span></div>
       </div>
+      {error && <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">Gagal memuat statistik: {error}</p>}
 
       {/* Filter Bar */}
       <section
@@ -141,12 +172,12 @@ export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: s
         <StatCard label="Akumulasi Alpa" value={summary.totalAlpa} color="danger" />
       </section>
       <p className="text-xs text-muted">
-        Rata-rata kehadiran dihitung dari total kehadiran siswa dibandingkan {currentSemester.totalHariEfektif} hari efektif sekolah pada {currentSemester.label}.
+        Persentase dihitung dari total hadir dibandingkan hari presensi yang tercatat pada kelas dan periode tersebut.
       </p>
 
       {/* Table Data */}
       <section aria-label="Tabel statistik kehadiran siswa semester" className={`${card} overflow-hidden`}>
-        {filteredStats.length === 0 ? (
+        {loading ? <EmptyState title="Memuat statistik" description="Mengambil rekap kehadiran dari backend." /> : filteredStats.length === 0 ? (
           <EmptyState
             title="Data siswa tidak ditemukan"
             description="Tidak ada data siswa yang cocok dengan filter atau kata kunci pencarian Anda."

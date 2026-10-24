@@ -19,7 +19,7 @@ Backend ini dibangun dengan prinsip modularitas, pengamanan berlapis (RBAC, IDOR
 | **Attendance** | `/api/v1/attendance` | Batch save atomik (`$transaction`), riwayat tanggal, rekap kehadiran semester (`groupBy` agregasi DB), pengelolaan jadwal sesi presensi. |
 | **Monitoring** | `/api/v1/monitoring` | Rekapitulasi kehadiran real-time seluruh kelas per tanggal via agregasi dual-query O(1). |
 | **Sick Letters** | `/api/v1/sick-letters` | Unggah surat izin/sakit dengan validasi MIME, batas 5MB, sanitasi UUID, dan proteksi IDOR. |
-| **Users** | `/api/v1/users` | Pengelolaan akun pengguna, hashing bcrypt, reset password mandiri & invalidasi sesi (Hanya Admin). |
+| **Users** | `/api/v1/users` | Pengelolaan akun pengguna, hashing bcrypt, perubahan password oleh Admin & invalidasi sesi. |
 | **Audit Logs** | `/api/v1/audit-logs` | Jejak audit aktivitas sistem dengan eager loading relasi aktor. |
 | **Health** | `/api/v1/health` | Healthcheck server dan status konektivitas database PostgreSQL. |
 
@@ -44,9 +44,7 @@ cp .env.example .env
 Variabel utama yang dikonfigurasi:
 - `PORT`: Port server backend (default: `4000`).
 - `DATABASE_URL`: URL koneksi PostgreSQL (contoh: `postgresql://postgres:postgres@localhost:5432/presensi_db?schema=public`).
-- `SESSION_SECRET`: Kunci rahasia session cookie (minimal 32 karakter).
-- `CSRF_SECRET`: Kunci rahasia token CSRF.
-- `CORS_ORIGINS`: Daftar domain yang diizinkan (contoh: `http://localhost:3000`).
+- `CORS_ORIGINS`: Daftar origin frontend yang diizinkan (contoh lokal: `http://localhost:3000`); wajib diisi dengan origin HTTPS di production.
 - `UPLOAD_DIR`: Direktori penyimpanan berkas surat izin/sakit (default: `./uploads`).
 
 ---
@@ -116,24 +114,17 @@ docker run -d \
 
 ## Backup & Restore Database
 
-### Pencadangan (Backup)
-```bash
-docker exec -t presensi-postgres pg_dump -U presensi -d presensi_dev --format=custom --blobs | gzip > backup_$(date +%Y%m%d_%H%M%S).dump.gz
-```
+Gunakan backup terjadwal dari penyedia PostgreSQL atau `pg_dump` dengan kredensial dari secret manager. Pulihkan backup ke database staging kosong untuk menguji proses pemulihan; jangan gunakan database produksi sebagai target uji.
 
-### Pemulihan (Restore)
 ```bash
-gunzip -c backup_YYYYMMDD_HHMMSS.dump.gz > restore.dump
-docker exec -i presensi-postgres pg_restore -U presensi -d presensi_dev --clean --if-exists restore.dump
+pg_dump --host="$PGHOST" --username="$PGUSER" --dbname="$PGDATABASE" --format=custom --file="presensi_$(date +%Y%m%d_%H%M%S).dump"
+pg_restore --host="$STAGING_PGHOST" --username="$STAGING_PGUSER" --dbname="$STAGING_PGDATABASE" --no-owner "presensi_YYYYMMDD_HHMMSS.dump"
 ```
 
 ---
 
-## Akun Pengujian & Seeding
+## Menyiapkan akun awal
 
-Kredensial akun pengujian dikonfigurasi melalui environment variable lokal tanpa membocorkan password ke source code (`.env.test.local` / `.env`):
-- `TEST_ADMIN_PASSWORD` (Admin: `admin.test@smkn11jakarta.sch.id`)
-- `TEST_GURU_PASSWORD` (Guru Piket: `guru.test@smkn11jakarta.sch.id`)
-- `TEST_KETUA_PASSWORD` (Ketua Kelas: `ketua.test@smkn11jakarta.sch.id`)
+Seed hanya membuat jadwal presensi dan, bila diminta, akun Admin pertama. Atur `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` secara lokal sebelum menjalankan seed. Keduanya wajib diisi bersama; password minimal 12 karakter. Seed tidak membuat akun, kelas, guru, atau siswa contoh, dan tidak mengubah password Admin yang sudah ada.
 
-Jika environment variable tidak diset saat `npm run prisma:seed`, seed akan menghasilkan token acak aman via `crypto.randomBytes`.
+Test end-to-end memakai database terisolasi bernama `presensi_test`. Set `NODE_ENV=test`, arahkan `DATABASE_URL` ke database tersebut, isi `TEST_ADMIN_PASSWORD` dan `TEST_KETUA_PASSWORD` (minimal 12 karakter), lalu jalankan `npm run prisma:seed:e2e` sebelum `npm run test:e2e`. Fixture menolak database lain agar tidak menyentuh data operasional.

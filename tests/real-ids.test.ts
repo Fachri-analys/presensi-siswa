@@ -4,10 +4,7 @@ import * as path from "node:path";
 import { createApiSchoolRepository } from "../lib/data/api-school";
 
 describe("Frontend ID Nyata & Penghapusan Mock ID (F5)", () => {
-  it("[F5-01] OWN_CLASS_ID dihapus total dari lib/mock.ts dan tidak diimpor di app maupun components", () => {
-    const mockContent = fs.readFileSync(path.resolve(__dirname, "../lib/mock.ts"), "utf-8");
-    expect(mockContent).not.toContain("export const OWN_CLASS_ID");
-
+  it("[F5-01] OWN_CLASS_ID tidak dipakai di app maupun components", () => {
     const checkDir = (dirName: string) => {
       const fullPath = path.resolve(__dirname, "..", dirName);
       const entries = fs.readdirSync(fullPath, { recursive: true, withFileTypes: true });

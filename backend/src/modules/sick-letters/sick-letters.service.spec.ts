@@ -81,7 +81,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
       originalname: 'surat.jpg',
       mimetype: 'image/jpeg',
       size: 10240,
-      buffer: Buffer.from('fake-image-bytes'),
+      buffer: Buffer.from([0xff, 0xd8, 0xff]),
     };
 
     await expect(
@@ -100,7 +100,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
       originalname: '../../../etc/passwd.png', // Percobaan path traversal
       mimetype: 'image/png',
       size: 2048,
-      buffer: Buffer.from('valid png'),
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     };
 
     mockPrisma.student.findFirst.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
