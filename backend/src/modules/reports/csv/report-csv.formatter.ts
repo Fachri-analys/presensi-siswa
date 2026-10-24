@@ -1,6 +1,8 @@
 /**
  * Formatter CSV sederhana tanpa dependency eksternal.
  * Escape: bungkus field dengan quote jika mengandung koma, quote, atau newline.
+ * Sel string yang diawali = + - @ dinetralkan agar tidak dieksekusi sebagai
+ * formula oleh Excel/Sheets (CSV injection).
  */
 
 export interface CsvColumn<T> {
@@ -9,7 +11,11 @@ export interface CsvColumn<T> {
 }
 
 function escapeCsvField(raw: string | number): string {
-  const s = String(raw ?? '');
+  let s = String(raw ?? '');
+  // Angka asli (mis. -5) tidak diubah, hanya string yang dinetralkan.
+  if (typeof raw === 'string' && /^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
