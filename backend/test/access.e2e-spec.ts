@@ -9,6 +9,11 @@ import { loginAndGetCookie } from './helpers/auth.helper';
 describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  const requireTestPassword = (name: string) => {
+    const value = process.env[name];
+    if (!value) throw new Error(`${name} wajib diatur untuk menjalankan E2E test.`);
+    return value;
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -45,7 +50,7 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     const adminCookies = await loginAndGetCookie(
       app,
       'admin.test@smkn11jakarta.sch.id',
-      process.env.TEST_ADMIN_PASSWORD || 'Admin#2026Password!',
+      requireTestPassword('TEST_ADMIN_PASSWORD'),
     );
 
     const response = await request(app.getHttpServer())
@@ -59,12 +64,11 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     const ketuaACookies = await loginAndGetCookie(
       app,
       'ketua.test@smkn11jakarta.sch.id',
-      process.env.TEST_KETUA_PASSWORD || 'Ketua#2026Password!',
+      requireTestPassword('TEST_KETUA_PASSWORD'),
     );
 
-    // Siswa di kelas B (X PPLG 1: nis 251101)
     const studentInKelasB = await prisma.student.findUnique({
-      where: { nis: '251101' },
+      where: { nis: 'e2e-student-kelas-b' },
     });
     expect(studentInKelasB).toBeDefined();
 
@@ -79,7 +83,7 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     const ketuaNullCookies = await loginAndGetCookie(
       app,
       'ketua.nokelas@smkn11jakarta.sch.id',
-      process.env.TEST_KETUA_PASSWORD || 'Ketua#2026Password!',
+      requireTestPassword('TEST_KETUA_PASSWORD'),
     );
 
     const response = await request(app.getHttpServer())

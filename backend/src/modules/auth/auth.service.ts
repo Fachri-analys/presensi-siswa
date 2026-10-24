@@ -8,6 +8,7 @@ import type { LoginDto } from './dto/login.dto';
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly dummyPasswordHash = bcrypt.hashSync(randomBytes(64).toString('hex'), 12);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -24,25 +25,11 @@ export class AuthService {
       where: { email: dto.email.toLowerCase() },
     });
 
-    if (!user) {
-      this.logger.warn(`Login gagal: email tidak ditemukan (${dto.email})`);
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
-        message: 'Email atau password salah.',
-      });
-    }
-
-    if (user.status !== 'active') {
-      this.logger.warn(`Login gagal: akun nonaktif (${dto.email})`);
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
-        message: 'Akun tidak aktif. Hubungi Admin sekolah.',
-      });
-    }
-
-    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordValid) {
-      this.logger.warn(`Login gagal: password salah (${dto.email})`);
+    const passwordValid = await bcrypt.compare(
+      dto.password,
+      user?.passwordHash ?? this.dummyPasswordHash,
+    );
+    if (!user || user.status !== 'active' || !passwordValid) {
       throw new UnauthorizedException({
         code: 'UNAUTHENTICATED',
         message: 'Email atau password salah.',
@@ -74,7 +61,7 @@ export class AuthService {
       kelasId: user.kelasId,
     };
 
-    this.logger.log(`Login sukses: ${user.email} (${user.role})`);
+    this.logger.log(`Login sukses: ${user.id} (${user.role})`);
 
     return { token: rawToken, user: sessionUser, expiresAt };
   }
@@ -111,6 +98,7 @@ export class AuthService {
     }
 
     if (session.user.status !== 'active') {
+      await this.prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
       return null;
     }
 

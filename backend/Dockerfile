@@ -1,5 +1,5 @@
 # Multi-stage production Dockerfile for Presensi Siswa Backend API
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY . .
 RUN npm run build
 
 # Production runtime stage
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
@@ -37,5 +37,8 @@ USER nestjs
 EXPOSE 4000
 
 ENV PORT=4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:4000/health/db').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "dist/main.js"]

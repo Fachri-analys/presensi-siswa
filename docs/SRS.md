@@ -6,7 +6,7 @@
 
 ## 1. Tujuan dan batas
 
-Dokumen ini mendefinisikan perilaku sistem yang harus dipenuhi backend dan frontend ketika frontend demo dihubungkan ke API. Syarat akses di dokumen ini harus ditegakkan server-side; UI bukan batas keamanan.
+Dokumen ini mendefinisikan perilaku sistem backend dan frontend yang terhubung melalui API. Syarat akses di dokumen ini harus ditegakkan server-side; UI bukan batas keamanan.
 
 ## 2. Aktor dan role
 
@@ -28,7 +28,7 @@ Matriks otorisasi:
 | Membaca monitoring/riwayat/laporan | Tidak | Kelas tugas | Semua kelas | Semua kelas |
 | Mencetak atau mengekspor laporan | Tidak | Kelas tugas | Semua kelas | Semua kelas |
 | Membaca log aktivitas | Tidak | Tidak | Ya | Ya |
-| Memulai reset password akun | Tidak | Tidak | Tidak | Ya |
+| Mengganti password akun | Tidak | Tidak | Tidak | Ya |
 
 ## 3. Persyaratan fungsional
 
@@ -39,7 +39,7 @@ Matriks otorisasi:
 - **FR-AUTH-03:** Sistem harus menyediakan pembacaan sesi saat ini dan logout yang membatalkan sesi server.
 - **FR-AUTH-04:** Sesi kedaluwarsa/tidak valid harus menghasilkan respons autentikasi yang dapat dikenali frontend; UI mengarahkan pengguna untuk login tanpa menampilkan detail internal.
 - **FR-AUTH-05:** Password tidak boleh dikembalikan pada respons API, log, atau profil sesi.
-- **FR-AUTH-06:** Hanya Admin dapat memulai reset password akun. Backend menerapkan mekanisme sekali pakai/kanal aman yang disepakati; endpoint tidak mengembalikan password baru.
+- **FR-AUTH-06:** Hanya Admin dapat menetapkan password akun melalui perubahan akun. Password baru minimal 12 karakter, disimpan sebagai hash, dan membatalkan sesi aktif. Reset mandiri belum tersedia.
 
 ### Presensi
 
@@ -119,7 +119,7 @@ Matriks otorisasi:
 2. Ketua Kelas dapat menyimpan presensi kelas tugas, tetapi request langsung ke kelas lain ditolak dan tidak mengubah database.
 3. Guru Piket dapat membuat/mengoreksi/menghapus presensi lintas kelas, tetapi request CRUD siswa/guru/kelas/akun ditolak.
 4. Admin dapat mengelola data dan menonaktifkan siswa; siswa nonaktif tidak muncul sebagai sasaran presensi baru, sementara riwayat lama tetap dapat dibaca.
-5. Hanya Admin dapat memulai reset password akun; respons dan audit tidak berisi password/token.
+5. Hanya Admin dapat mengganti password akun; password plaintext tidak pernah dikembalikan oleh API.
 6. Dua permintaan membuat presensi yang sama mengikuti aturan unik/konflik yang disepakati dan menghasilkan respons yang jelas.
 7. Gagal simpan tidak menampilkan status sukses dan data lama tidak hilang tanpa konfirmasi server.
 8. Monitoring, riwayat, PDF/cetak, dan Excel memakai dataset, tanggal, kelas, role, dan definisi hitung yang sama.

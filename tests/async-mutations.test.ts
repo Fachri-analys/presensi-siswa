@@ -28,9 +28,8 @@ describe("Frontend Mutasi Asinkron & Toast Sukses (F2)", () => {
     const content = readComponent("ketua-kelas-dashboard.tsx");
     expect(content).toMatch(/async\s+function\s+save\s*\(/);
     expect(content).toMatch(/async\s+function\s+remove\s*\(/);
-    // remove memanggil deleteAttendance dan mencatat menunggu B4
+    // Hapus menunggu konfirmasi backend.
     expect(content).toContain("deleteAttendance");
-    expect(content).toMatch(/menunggu\s+B4/i);
   });
 
   it("[F2-03] guru-piket-attendance saveAttendance bertipe async dan memanggil await", () => {
@@ -47,13 +46,13 @@ describe("Frontend Mutasi Asinkron & Toast Sukses (F2)", () => {
     expect(content).toMatch(/await\s+schoolRepo\.updateStudent/);
   });
 
-  it("[F2-05] admin-teachers saveTeacher, deleteTeacher, dan toggleTeacherStatus bertipe async dan memanggil await", () => {
+  it("[F2-05] admin-teachers save, remove, dan toggle bertipe async dan memanggil await", () => {
     const content = readComponent("admin-teachers.tsx");
-    expect(content).toMatch(/async\s+function\s+saveTeacher\s*\(/);
-    expect(content).toMatch(/async\s+function\s+deleteTeacher\s*\(/);
-    expect(content).toMatch(/async\s+function\s+toggleTeacherStatus\s*\(/);
-    expect(content).toMatch(/await\s+adminRepo\.updateTeacher/);
-    expect(content).toMatch(/await\s+adminRepo\.deleteTeacher/);
-    expect(content).toMatch(/await\s+adminRepo\.setTeacherActive/);
+    expect(content).toMatch(/async\s+function\s+save\s*\(/);
+    expect(content).toMatch(/async\s+function\s+remove\s*\(/);
+    expect(content).toMatch(/async\s+function\s+toggle\s*\(/);
+    expect(content).toMatch(/await\s+repo\.updateTeacher/);
+    expect(content).toMatch(/await\s+repo\.deleteTeacher/);
+    expect(content).toMatch(/await\s+repo\.setTeacherActive/);
   });
 });

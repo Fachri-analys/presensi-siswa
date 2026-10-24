@@ -1,25 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Eye, FilePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
-import { addDemoActivity } from "@/lib/activity-log";
-import { getAccountRows, getClass } from "@/lib/mock";
+import { getLocalDateKey, getLocalTime } from "@/lib/time";
 import { useRole } from "./app-shell";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
-import { canMarkPresent } from "@/lib/demo-schedule";
 import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
 import { btn, field, StatCard, StatusBadge } from "./ui";
 import { useAttendanceWindow } from "./use-attendance-window";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { apiErrorMessage } from "@/lib/data/api-client";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import type { AttendanceRecord, SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
-// Ketua Kelas hanya melihat kelasnya sendiri. ID ini mock; di produksi diambil dari sesi
-// dan pembatasan aksesnya tetap dipaksakan di backend.
+// Ketua Kelas hanya melihat kelas yang ditetapkan pada sesi server.
 const PRESENT: Status[] = ["HADIR", "TERLAMBAT"];
 
 type DialogState = { kind: "form" | "detail" | "delete"; nis?: string } | null;
@@ -105,15 +102,24 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
 export function KetuaKelasDashboard() {
   const { user, kelasId: sessionClassId } = useRole();
   const kelasId = sessionClassId ?? "";
-  const kelas = getClass(kelasId) ?? (kelasId ? { id: kelasId, nama: `Kelas ${kelasId}` } : undefined);
-  const ketuaName = user?.nama ?? getAccountRows().find((account) => account.role === "KETUA_KELAS" && account.kelasId === kelasId)?.nama ?? "Ketua Kelas";
-  const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
+  const [kelas, setKelas] = useState<SchoolClass | null>(null);
+  const [roster, setRoster] = useState<SchoolStudent[]>([]);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const ketuaName = user?.nama ?? "Ketua Kelas";
   const [date] = useState(getLocalDateKey);
   const { activeSession, ready } = useAttendanceWindow();
-  const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
-  const savedAttendance = attendanceStore[`${date}::${kelasId}`] ?? {};
+  const refresh = useCallback(async () => {
+    const school = createApiSchoolRepository(); const attendance = createApiAttendanceRepository();
+    if (!school || !attendance || !kelasId) { setLoadingError("Backend belum dikonfigurasi atau akun belum memiliki kelas."); return; }
+    try {
+      const [classItem, studentsPage, saved] = await Promise.all([school.getClass(kelasId), school.listStudents({ kelasId, status: "active", limit: 100 }), attendance.listClassAttendance(kelasId, date)]);
+      setKelas(classItem); setRoster(studentsPage.items); setRecords(saved); setLoadingError(null);
+    } catch (err: unknown) { setLoadingError(apiErrorMessage(err)); }
+  }, [kelasId, date]);
+  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
+  const savedAttendance = Object.fromEntries(records.map((record) => [record.nis, record]));
   const students: Student[] = roster
-    .filter((student) => student.kelasId === kelasId && student.status === "active")
     .map((student) => {
       const saved = savedAttendance[student.nis];
       return {
@@ -148,68 +154,34 @@ export function KetuaKelasDashboard() {
 
   async function save(nis: string, status: Status, keterangan: string) {
     const previous = savedAttendance[nis];
-    if (PRESENT.includes(status) && !canMarkPresent(activeSession !== null, Boolean(previous?.izinHadir))) {
-      setToast("Status Hadir/Terlambat di luar jadwal memerlukan izin Guru Piket.");
-      return;
-    }
     const waktu = PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null;
     const attendanceRepo = createApiAttendanceRepository();
-    if (attendanceRepo) {
-      try {
-        await attendanceRepo.saveClassAttendance({
-          date,
-          kelasId: kelasId || "xi-pplg-1",
-          records: [
-            {
-              nis,
-              status,
-              waktu,
-              keterangan,
-            },
-          ],
-        });
-      } catch (err: unknown) {
-        setToast(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
-        return;
-      }
-    }
-
-    const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
-    records[nis] = {
-      status,
-      keterangan,
-      waktu,
-      izinHadir: PRESENT.includes(status) ? false : previous?.izinHadir,
-    };
-    if (!saveDemoAttendance(kelasId || "xi-pplg-1", date, records)) {
-      setToast("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
+    if (!attendanceRepo) { setToast("Backend belum dikonfigurasi."); return; }
+    try {
+      if (previous?.id) await attendanceRepo.updateAttendance(previous.id, { status, waktu, keterangan });
+      else await attendanceRepo.saveClassAttendance({ date, kelasId, records: [{ nis, status, waktu, keterangan }] });
+    } catch (err: unknown) {
+      setToast(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
       return;
     }
 
-    addDemoActivity("Presensi siswa diperbarui", `Ketua Kelas mengubah presensi ${target?.nama ?? nis} di kelas ${kelas?.nama ?? kelasId}.`);
+    await refresh();
     close();
     setToast("Presensi disimpan");
   }
 
   async function remove(nis: string) {
     const attendanceRepo = createApiAttendanceRepository();
-    if (attendanceRepo) {
-      try {
-        // Menunggu B4: endpoint DELETE attendance/:id baru tersedia di backend Tahap 4
-        await attendanceRepo.deleteAttendance(nis);
-      } catch (err: unknown) {
-        setToast(`Gagal menghapus presensi: Fitur hapus presensi belum tersedia di server (menunggu B4). ${apiErrorMessage(err)}`);
-        return;
-      }
-    }
-
-    const records: Record<string, DemoAttendanceRecord> = { ...savedAttendance };
-    delete records[nis];
-    if (!saveDemoAttendance(kelasId || "xi-pplg-1", date, records)) {
-      setToast("Presensi belum berhasil dihapus. Coba lagi beberapa saat.");
+    const attendanceRecord = savedAttendance[nis];
+    if (!attendanceRepo || !attendanceRecord) { setToast("Presensi tidak ditemukan di backend."); return; }
+    try {
+      await attendanceRepo.deleteAttendance(attendanceRecord.id);
+    } catch (err: unknown) {
+      setToast(`Gagal menghapus presensi: ${apiErrorMessage(err)}`);
       return;
     }
-    addDemoActivity("Presensi siswa dihapus", `Ketua Kelas menghapus presensi ${target?.nama ?? nis} di kelas ${kelas?.nama ?? kelasId}.`);
+
+    await refresh();
     close();
     setToast("Presensi dihapus");
   }
@@ -230,6 +202,7 @@ export function KetuaKelasDashboard() {
 
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
+      {loadingError && <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">Gagal memuat kelas: {loadingError}</p>}
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Presensi Kelas {kelas?.nama}</h1>
@@ -285,7 +258,7 @@ export function KetuaKelasDashboard() {
         <PresensiForm
           options={students}
           target={target}
-          presentAllowedFor={(nis) => canMarkPresent(activeSession !== null, Boolean(savedAttendance[nis]?.izinHadir))}
+          presentAllowedFor={() => true}
           onSubmit={save}
           onCancel={close}
         />

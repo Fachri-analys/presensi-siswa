@@ -9,7 +9,6 @@ export interface DatabaseConfig {
 }
 
 export interface SessionConfig {
-  secret: string;
   name: string;
   maxAge: number; // ms
   secure: boolean;
@@ -18,7 +17,6 @@ export interface SessionConfig {
 
 export interface SecurityConfig {
   bcryptRounds: number;
-  csrfSecret: string;
 }
 
 export interface UploadConfig {
@@ -29,7 +27,7 @@ export interface UploadConfig {
 export default () => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
-    port: parseInt(process.env.PORT ?? '3000', 10),
+    port: parseInt(process.env.PORT ?? '4000', 10),
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
       .split(',')
       .map((s) => s.trim())
@@ -41,7 +39,6 @@ export default () => ({
   } as DatabaseConfig,
 
   session: {
-    secret: process.env.SESSION_SECRET ?? '',
     name: process.env.SESSION_COOKIE_NAME ?? 'presensi_session',
     maxAge: parseInt(process.env.SESSION_MAX_AGE_MS ?? '28800000', 10), // 8 jam
     secure: process.env.NODE_ENV === 'production',
@@ -50,7 +47,6 @@ export default () => ({
 
   security: {
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10),
-    csrfSecret: process.env.CSRF_SECRET ?? '',
   } as SecurityConfig,
 
   upload: {

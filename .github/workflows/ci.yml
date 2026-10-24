@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "codex/**"]
   pull_request:
 
 permissions:
@@ -16,10 +16,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -37,8 +37,11 @@ jobs:
       - name: Build Next.js application
         run: npm run build
 
+      - name: Build frontend container
+        run: docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.invalid/api/v1/ -t presensi-frontend:ci .
+
       - name: Security audit dependencies
-        run: npm audit --omit=dev || true
+        run: npm audit --audit-level=high
 
   backend:
     name: Backend (NestJS + Prisma)
@@ -49,30 +52,28 @@ jobs:
         env:
           POSTGRES_USER: presensi
           POSTGRES_PASSWORD: presensi_dev_password
-          POSTGRES_DB: presensi_dev
+          POSTGRES_DB: presensi_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U presensi -d presensi_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://presensi:presensi_dev_password@localhost:5432/presensi_dev?schema=public
-      SESSION_SECRET: e6b2c7e997f75e2fa41893dca6094392138ad3fe68a834279dfc82c65a88c7d1
-      CSRF_SECRET: a5f1d8c946e82f3ba70932dcb6095481239bd4ef79b945380efd93d76b99d8e2
+      NODE_ENV: test
+      DATABASE_URL: postgresql://presensi:presensi_dev_password@localhost:5432/presensi_test?schema=public
       PORT: 4000
-      TEST_ADMIN_PASSWORD: Admin#2026Password!
-      TEST_GURU_PASSWORD: Guru#2026Password!
-      TEST_KETUA_PASSWORD: Ketua#2026Password!
+      TEST_ADMIN_PASSWORD: test-admin-${{ github.run_id }}-Password
+      TEST_KETUA_PASSWORD: test-ketua-${{ github.run_id }}-Password
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -88,8 +89,8 @@ jobs:
         run: npx prisma migrate deploy
         working-directory: backend
 
-      - name: Seed database
-        run: npm run prisma:seed
+      - name: Seed isolated E2E fixtures
+        run: npm run prisma:seed:e2e
         working-directory: backend
 
       - name: Lint backend
@@ -108,6 +109,14 @@ jobs:
         run: npm run test:e2e
         working-directory: backend
 
+      - name: Security audit backend dependencies
+        run: npm audit --audit-level=high
+        working-directory: backend
+
       - name: Build NestJS application
         run: npm run build
+        working-directory: backend
+
+      - name: Build backend container
+        run: docker build -t presensi-backend:ci .
         working-directory: backend

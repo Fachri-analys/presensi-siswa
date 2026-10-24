@@ -42,7 +42,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
         findMany: jest.fn(),
       },
       class: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ status: ActiveStatus.active }),
       },
       auditLog: {
         create: jest.fn(),
@@ -153,6 +153,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     // hanya terkunci yang diuji)
     mockNowWibTime.mockReturnValue('08:00');
 
+    mockPrisma.student.findMany.mockResolvedValueOnce([{ id: 'std-1', nis: '241101' }]);
     mockPrisma.schedule.findMany.mockResolvedValueOnce([
       { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: true },
     ]);
@@ -183,6 +184,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     // Jam saat ini di luar window (sesi PAGI 07:00-12:00, SIANG 13:00-15:00, sekarang 17:00)
     mockNowWibTime.mockReturnValue('17:00');
 
+    mockPrisma.student.findMany.mockResolvedValueOnce([{ id: 'std-1', nis: '241101' }]);
     mockPrisma.schedule.findMany.mockResolvedValueOnce([
       { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: false },
       { session: AttendanceSession.SIANG, mulai: '13:00', selesai: '15:00', terkunci: false },

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ClassesService } from './classes.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConflictException } from '@nestjs/common';
-import { ActiveStatus } from '@prisma/client';
+import { ActiveStatus, Role } from '@prisma/client';
 
 describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
   let service: ClassesService;
@@ -10,6 +10,7 @@ describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
 
   beforeEach(async () => {
     mockPrisma = {
+      $transaction: jest.fn((callback) => callback(mockPrisma)),
       class: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -86,7 +87,7 @@ describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
       },
     ]);
 
-    const result = await service.findAll();
+    const result = await service.findAll({ id: 'usr-admin', email: 'admin@test.com', nama: 'Admin', role: Role.ADMIN, kelasId: null });
     expect(result.length).toBe(1);
     expect(result[0].ketuaNama).toBe('Aisyah Putri');
     expect(result[0].totalSiswa).toBe(30);
@@ -108,7 +109,7 @@ describe('ClassesService (CRUD Kelas, Eager Loading)', () => {
         leader: { id: 'usr-1', nama: 'Aisyah Putri', email: 'aisyah@test.com' },
         _count: { students: 25 },
       });
-    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'usr-1', nama: 'Aisyah Putri' });
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'usr-1', nama: 'Aisyah Putri', role: Role.KETUA_KELAS, status: ActiveStatus.active, kelasId: null });
     mockPrisma.user.updateMany.mockResolvedValueOnce({ count: 1 });
     mockPrisma.user.update.mockResolvedValueOnce({ id: 'usr-1', kelasId: 'cls-1' });
 

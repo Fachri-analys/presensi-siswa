@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditResult, Role } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { AttendanceSession, AuditResult, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { SessionUser } from '../../common/types/session-user.type';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -62,6 +62,7 @@ export class SchedulesService {
         message: 'Jadwal tidak ditemukan.',
       });
     }
+
     return schedule;
   }
 
@@ -80,6 +81,20 @@ export class SchedulesService {
         code: 'NOT_FOUND',
         message: 'Jadwal tidak ditemukan.',
       });
+    }
+
+    const mulai = dto.mulai ?? schedule.mulai;
+    const selesai = dto.selesai ?? schedule.selesai;
+    if (mulai >= selesai) {
+      throw new BadRequestException('Jam selesai harus setelah jam mulai.');
+    }
+    const otherSession = await this.prisma.schedule.findUnique({
+      where: { session: schedule.session === AttendanceSession.PAGI ? AttendanceSession.SIANG : AttendanceSession.PAGI },
+    });
+    const pagiSelesai = schedule.session === AttendanceSession.PAGI ? selesai : otherSession?.selesai;
+    const siangMulai = schedule.session === AttendanceSession.SIANG ? mulai : otherSession?.mulai;
+    if (pagiSelesai && siangMulai && pagiSelesai > siangMulai) {
+      throw new BadRequestException('Jadwal sesi pagi dan siang tidak boleh bertabrakan.');
     }
 
     const updated = await this.prisma.schedule.update({

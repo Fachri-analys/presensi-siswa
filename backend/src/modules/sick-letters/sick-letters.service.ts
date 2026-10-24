@@ -17,7 +17,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/png',
   'application/pdf',
 ]);
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = Number(process.env.UPLOAD_MAX_SIZE_BYTES ?? 5 * 1024 * 1024);
 
 export interface UploadFile {
   originalname: string;
@@ -58,6 +58,14 @@ export class SickLettersService {
       );
     }
 
+    const hasValidSignature =
+      (file.mimetype === 'application/pdf' && file.buffer.subarray(0, 5).toString() === '%PDF-') ||
+      (file.mimetype === 'image/png' && file.buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+      (file.mimetype === 'image/jpeg' && file.buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255])));
+    if (!hasValidSignature) {
+      throw new BadRequestException('Isi file tidak sesuai dengan format yang diizinkan.');
+    }
+
     // 3. Proteksi IDOR / BOLA: Ketua Kelas hanya dapat mengunggah untuk kelasnya
     if (user.role === Role.KETUA_KELAS && user.kelasId !== dto.kelasId) {
       throw new ForbiddenException('Akses ditolak: Anda tidak memiliki akses ke kelas ini.');
@@ -75,19 +83,19 @@ export class SickLettersService {
     }
 
     // 4. Sanitasi nama file & cegah path traversal menggunakan hash unik
-    const ext = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
-    const safeExt = ['.jpg', '.jpeg', '.png', '.pdf'].includes(ext) ? ext : '.bin';
+    const safeExt = file.mimetype === 'image/jpeg' ? '.jpg' : file.mimetype === 'image/png' ? '.png' : '.pdf';
     const randomName = `${crypto.randomUUID()}${safeExt}`;
     const destinationPath = path.join(this.uploadDir, randomName);
 
     // Simpan buffer file secara aman
-    fs.writeFileSync(destinationPath, file.buffer);
+    fs.writeFileSync(destinationPath, file.buffer, { flag: 'wx', mode: 0o600 });
 
     const recordDate = new Date(dto.date);
 
     // Simpan metadata ke database
-    return this.prisma.sickLetter.create({
-      data: {
+    try {
+      return await this.prisma.sickLetter.create({
+        data: {
         date: new Date(Date.UTC(recordDate.getUTCFullYear(), recordDate.getUTCMonth(), recordDate.getUTCDate())),
         kelasId: dto.kelasId,
         studentId: student.id,
@@ -96,9 +104,25 @@ export class SickLettersService {
         filePath: destinationPath,
         fileSize: file.size,
         mimeType: file.mimetype,
-        uploadedById: user.id,
-      },
-    });
+          uploadedById: user.id,
+        },
+        select: {
+          id: true,
+          date: true,
+          kelasId: true,
+          studentId: true,
+          keterangan: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          uploadedById: true,
+          createdAt: true,
+        },
+      });
+    } catch (error) {
+      fs.rmSync(destinationPath, { force: true });
+      throw error;
+    }
   }
 
   async findByClass(kelasId: string, user: SessionUser) {
@@ -108,7 +132,17 @@ export class SickLettersService {
 
     return this.prisma.sickLetter.findMany({
       where: { kelasId },
-      include: {
+      select: {
+        id: true,
+        date: true,
+        kelasId: true,
+        studentId: true,
+        keterangan: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        uploadedById: true,
+        createdAt: true,
         student: { select: { nis: true, nama: true } },
       },
       orderBy: { createdAt: 'desc' },

@@ -1,40 +1,40 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FilePlus } from "lucide-react";
-import { addDemoActivity } from "@/lib/activity-log";
-import { getDemoAttendance, getDemoAttendanceServerSnapshot, getLocalDateKey, getLocalTime, saveDemoAttendance, subscribeToDemoAttendance, type DemoAttendanceRecord } from "@/lib/demo-attendance";
-import { getDemoStudents, getDemoStudentsServerSnapshot, subscribeToDemoStudents } from "@/lib/demo-students";
-import { getClasses } from "@/lib/mock";
+import { getLocalDateKey, getLocalTime } from "@/lib/time";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { btn, card, EmptyState, field, StatCard } from "@/components/ui";
 import { useAttendanceWindow } from "@/components/use-attendance-window";
 import { useRole } from "@/components/app-shell";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { apiErrorMessage } from "@/lib/data/api-client";
+import { createApiSchoolRepository } from "@/lib/data/api-school";
+import type { AttendanceRecord, SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { SuratSakitModal } from "./surat-sakit-modal";
 
-const classes = getClasses();
 const statuses: Status[] = ["HADIR", "TERLAMBAT", "IZIN", "SAKIT", "ALPA"];
 const CELL = "px-4 py-3";
+type DraftRecord = { id?: string; status: Status | null; waktu: string | null; keterangan: string; izinHadir?: boolean };
 
 export function GuruPiketAttendance({ initialClassId }: { initialClassId: string }) {
   const { role } = useRole();
   const canGrantPresentPermission = role === "GURU_PIKET";
-  const [classId, setClassId] = useState(() => classes.some((item) => item.id === initialClassId) ? initialClassId : classes[0].id);
+  const [classId, setClassId] = useState(initialClassId);
   const [date, setDate] = useState(getLocalDateKey);
-  const attendanceStore = useSyncExternalStore(subscribeToDemoAttendance, getDemoAttendance, getDemoAttendanceServerSnapshot);
-  const [draft, setDraft] = useState<Record<string, DemoAttendanceRecord> | null>(null);
-  const roster = useSyncExternalStore(subscribeToDemoStudents, getDemoStudents, getDemoStudentsServerSnapshot);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [roster, setRoster] = useState<SchoolStudent[]>([]);
+  const [savedRecords, setSavedRecords] = useState<AttendanceRecord[]>([]);
+  const [draft, setDraft] = useState<Record<string, DraftRecord> | null>(null);
+  const [approvedNis, setApprovedNis] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [suratSakitOpen, setSuratSakitOpen] = useState(false);
   const { activeSession, ready } = useAttendanceWindow();
-  const savedAttendance = attendanceStore[`${date}::${classId}`] ?? {};
+  const savedAttendance = useMemo(() => Object.fromEntries(savedRecords.map((record) => [record.nis, { ...record, izinHadir: approvedNis.includes(record.nis) }])), [savedRecords, approvedNis]);
   const attendance = draft ?? savedAttendance;
   const kelas = classes.find((item) => item.id === classId);
   const students: Student[] = roster
-    .filter((student) => student.kelasId === classId && student.status === "active")
     .map((student) => ({
       nis: student.nis,
       nama: student.nama,
@@ -42,6 +42,28 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
       waktu: attendance[student.nis]?.waktu ?? null,
       keterangan: attendance[student.nis]?.keterangan ?? "",
     }));
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      const school = createApiSchoolRepository(); const attendanceRepo = createApiAttendanceRepository();
+      if (!school || !attendanceRepo) { setMessage("Backend belum dikonfigurasi."); return; }
+      return school.listClasses().then(async (classPage) => {
+        if (!active) return;
+        setClasses(classPage.items);
+        const selected = classPage.items.find((item) => item.id === classId) ?? classPage.items.find((item) => item.id === initialClassId) ?? classPage.items[0];
+        if (!selected) { setRoster([]); setSavedRecords([]); return; }
+        if (selected.id !== classId) { setClassId(selected.id); return; }
+        const [studentsPage, records] = await Promise.all([
+          school.listStudents({ kelasId: selected.id, status: "active", limit: 100 }),
+          attendanceRepo.listClassAttendance(selected.id, date),
+        ]);
+        if (!active) return;
+        setRoster(studentsPage.items); setSavedRecords(records); setMessage(null);
+      }).catch((err: unknown) => { if (active) setMessage(`Gagal memuat data: ${apiErrorMessage(err)}`); });
+    });
+    return () => { active = false; };
+  }, [classId, date, initialClassId]);
 
   const search = query.trim().toLowerCase();
   const filtered = students.filter((student) => !search || `${student.nama} ${student.nis}`.toLowerCase().includes(search));
@@ -55,6 +77,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
     if (draft && !window.confirm("Perubahan yang belum disimpan akan dibuang. Lanjutkan?")) return;
     setClassId(nextClassId);
     setDraft(null);
+    setApprovedNis([]);
     setQuery("");
     setMessage(null);
   }
@@ -73,29 +96,30 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
           ? (next[nis]?.waktu ?? getLocalTime())
           : null,
         keterangan: next[nis]?.keterangan ?? "",
-        izinHadir: status === "HADIR" || status === "TERLAMBAT" ? false : next[nis]?.izinHadir,
+        izinHadir: next[nis]?.izinHadir,
       };
       return next;
     });
     setMessage(null);
   }
 
-  function setStudentApproval(nis: string, approved: boolean) {
+  async function setStudentApproval(nis: string, approved: boolean) {
     if (!canGrantPresentPermission) return;
-    setDraft((current) => {
-      const next = { ...(current ?? savedAttendance) };
-      const previous = next[nis] ?? { status: null, waktu: null, keterangan: "" };
-      next[nis] = { ...previous, izinHadir: approved };
-      return next;
-    });
-    setMessage(null);
+    if (!approved || approvedNis.includes(nis)) return;
+    const repo = createApiAttendanceRepository();
+    try {
+      if (!repo) throw new Error("Backend belum dikonfigurasi.");
+      await repo.grantPresentPermission({ date, kelasId: classId, nis });
+      setApprovedNis((current) => [...current, nis]); setMessage(`Izin hadir diberikan untuk NIS ${nis}.`);
+    } catch (err: unknown) { setMessage(`Gagal memberi izin hadir: ${apiErrorMessage(err)}`); }
   }
 
   async function saveAttendance() {
     if (!kelas || draft === null) return;
 
     const attendanceRepo = createApiAttendanceRepository();
-    if (attendanceRepo) {
+    if (!attendanceRepo) { setMessage("Backend belum dikonfigurasi."); return; }
+    {
       const records = Object.entries(attendance)
         .filter(([, v]) => v && v.status)
         .map(([nis, v]) => ({
@@ -105,33 +129,26 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
           keterangan: v.keterangan || "",
         }));
 
-      if (records.length > 0) {
-        try {
+      try {
+        await Promise.all(savedRecords.filter((saved) => !attendance[saved.nis]?.status).map((saved) => attendanceRepo.deleteAttendance(saved.id)));
+        if (records.length > 0) {
           await attendanceRepo.saveClassAttendance({
             date,
             kelasId: classId,
             records,
           });
-        } catch (err: unknown) {
-          setMessage(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
-          return;
         }
+      } catch (err: unknown) {
+        setMessage(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
+        return;
       }
     }
 
-    if (!saveDemoAttendance(classId, date, attendance)) {
-      setMessage("Presensi belum berhasil disimpan. Coba lagi beberapa saat.");
-      return;
-    }
-
     setDraft(null);
-    const approvals = students.filter((student) => attendance[student.nis]?.izinHadir).length;
-    const actor = role === "ADMIN" ? "Admin" : "Guru Piket";
-    addDemoActivity(
-      "Presensi kelas disimpan",
-      `${actor} menyimpan presensi ${done} dari ${students.length} siswa kelas ${kelas.nama} untuk ${date}.${remaining ? ` ${remaining} siswa belum diisi.` : ""}${approvals ? ` Izin Hadir di luar jadwal aktif untuk ${approvals} siswa.` : ""}`
-    );
-    setMessage(`Presensi ${done} siswa kelas ${kelas.nama} berhasil disimpan.${remaining ? ` ${remaining} siswa masih belum diisi.` : ""}${approvals ? ` Izin Hadir luar jadwal aktif untuk ${approvals} siswa.` : ""}`);
+    setApprovedNis([]);
+    setMessage(`Presensi ${done} siswa kelas ${kelas.nama} berhasil disimpan.${remaining ? ` ${remaining} siswa masih belum diisi.` : ""}`);
+    try { setSavedRecords(await attendanceRepo.listClassAttendance(classId, date)); }
+    catch (err: unknown) { setMessage(`Presensi tersimpan, tetapi daftar gagal dimuat: ${apiErrorMessage(err)}`); }
   }
 
   return (
@@ -162,6 +179,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
             if (draft && !window.confirm("Perubahan yang belum disimpan akan dibuang. Lanjutkan?")) return;
             setDate(event.target.value);
             setDraft(null);
+            setApprovedNis([]);
             setMessage(null);
           }} className={`${field} w-full min-w-0`} />
         </label>
@@ -192,7 +210,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         </button>
       </div>
 
-      {message && <p role={message.startsWith("Presensi belum") ? "alert" : "status"} className={`rounded-md px-4 py-3 text-sm font-medium ${message.startsWith("Presensi belum") ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>{message}</p>}
+      {message && <p role={message.startsWith("Gagal") ? "alert" : "status"} className={`rounded-md px-4 py-3 text-sm font-medium ${message.startsWith("Gagal") ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>{message}</p>}
 
       <section aria-label={`Daftar presensi ${kelas?.nama}`} className={`${card} overflow-hidden`}>
         {filtered.length === 0 ? (
@@ -218,6 +236,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
                       <input
                         type="checkbox"
                         checked={Boolean(attendance[student.nis]?.izinHadir)}
+                        disabled={approvedNis.includes(student.nis)}
                         onChange={(event) => setStudentApproval(student.nis, event.target.checked)}
                         className="mt-0.5 accent-primary"
                       />
@@ -256,6 +275,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
                             <input
                               type="checkbox"
                               checked={Boolean(attendance[student.nis]?.izinHadir)}
+                              disabled={approvedNis.includes(student.nis)}
                               onChange={(event) => setStudentApproval(student.nis, event.target.checked)}
                               className="accent-primary"
                             />

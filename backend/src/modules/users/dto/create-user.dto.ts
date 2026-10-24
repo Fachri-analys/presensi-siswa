@@ -21,9 +21,8 @@ export class CreateUserDto {
   @IsString()
   kelasId?: string | null;
 
-  @ApiPropertyOptional({ example: 'Password123!' })
-  @IsOptional()
+  @ApiProperty({ example: 'SandiAwalYangPanjang!' })
   @IsString()
-  @MinLength(8)
-  password?: string;
+  @MinLength(12)
+  password!: string;
 }

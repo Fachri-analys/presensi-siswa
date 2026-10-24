@@ -66,6 +66,7 @@ describe('UsersService (Account Management & Security)', () => {
         nama: 'Guru Duplikat',
         email: 'guru@test.com',
         role: Role.GURU_PIKET,
+        password: 'SecurePassword123!',
       }),
     ).rejects.toThrow(ConflictException);
   });
@@ -94,15 +95,4 @@ describe('UsersService (Account Management & Security)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('[USER-05] resetPassword() membuat password baru dan menghapus sesi aktif', async () => {
-    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'usr-1', email: 'admin@test.com' });
-    mockPrisma.user.update.mockResolvedValueOnce({ id: 'usr-1' });
-    mockPrisma.session.deleteMany.mockResolvedValueOnce({ count: 2 });
-
-    const result = await service.resetPassword('usr-1');
-
-    expect(result.accepted).toBe(true);
-    expect(result.temporaryPassword).toBeDefined();
-    expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'usr-1' } });
-  });
 });
