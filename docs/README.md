@@ -18,14 +18,23 @@ Panduan alur kontribusi dan standar kode repository ada di [../CONTRIBUTING.md](
 
 Repository ini mengintegrasikan seluruh ekosistem aplikasi ke dalam satu repository (monorepo):
 1. **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4. Terletak di root directory.
-2. **Backend**: NestJS 10, Prisma ORM 5, PostgreSQL 16, TypeScript. Terletak di direktori [`../backend`](../backend).
+2. **Backend**: NestJS 11, Prisma ORM 5, PostgreSQL 16, TypeScript. Terletak di direktori [`../backend`](../backend).
 3. **Database & Container**: Konfigurasi Docker Compose untuk PostgreSQL dan skrip inisialisasi tersedia di [`../backend/docker-compose.yml`](../backend/docker-compose.yml).
 4. **API Integration Layer**: Terletak di [`../lib/data`](../lib/data), menyediakan kontrak antarmuka (`contracts.ts`), decoder type-safe (`decoders.ts`), dan repository API adapter (`api-auth.ts`, `api-school.ts`, `api-attendance.ts`, `api-monitoring.ts`, `api-admin.ts`, `api-activity.ts`).
-5. **CI/CD**: GitHub Actions workflow terintegrasi (`.github/workflows/ci.yml`) yang memvalidasi linting, typechecking, build, dan automated testing untuk Frontend dan Backend pada setiap push dan pull request.
+5. **CI**: GitHub Actions (`.github/workflows/ci.yml`) menjalankan lint, typecheck, test, audit dependensi, build aplikasi, dan build image Docker. Workflow berjalan saat push ke `main`, `production-ready`, atau `feature/**`, saat pull request ke `main`, dan bisa dijalankan manual.
 
 ---
 
 ## Panduan Cepat Menjalankan Sistem
+
+Gunakan Node.js `>=22.12.0`, npm `>=10`, dan Docker Compose. Dari root repository, siapkan environment dan instal dependensi:
+
+```bash
+cp .env.example .env.local
+cp backend/.env.example backend/.env
+npm ci
+npm --prefix backend ci
+```
 
 1. **Jalankan Database PostgreSQL**:
    ```bash
@@ -45,8 +54,9 @@ Repository ini mengintegrasikan seluruh ekosistem aplikasi ke dalam satu reposit
    ```bash
    npm run dev
    ```
-5. **Jalankan Seluruh Test Otomatis**:
+5. **Jalankan Test**:
    ```bash
-   npm test               # 40 Frontend Tests (Vitest)
-   npm run backend:test   # 36 Backend Tests (Jest)
+   npm test                              # Test frontend (Vitest)
+   npm run backend:test                  # Unit test backend (Jest)
+   npm --prefix backend run test:e2e     # E2E backend; perlu database test terisolasi
    ```

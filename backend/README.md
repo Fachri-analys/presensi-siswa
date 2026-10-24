@@ -2,13 +2,13 @@
 
 Backend API resmi untuk Sistem Presensi Siswa SMK Negeri 11 Jakarta.
 
-**Stack:** NestJS 10 · PostgreSQL 16 · Prisma 5 · TypeScript 5 · Docker
+**Stack:** NestJS 11 · PostgreSQL 16 · Prisma 5 · TypeScript 5 · Docker
 
 ---
 
 ## Arsitektur & Modul
 
-Backend ini dibangun dengan prinsip modularitas, pengamanan berlapis (RBAC, IDOR guard, anti-CSRF), dan optimasi database tanpa masalah N+1 query:
+Backend ini memakai modul domain terpisah dan pengamanan berlapis, termasuk RBAC, pemeriksaan akses objek, dan proteksi CSRF:
 
 | Modul | Endpoint Utama | Deskripsi & Otorisasi |
 | :--- | :--- | :--- |
@@ -27,7 +27,7 @@ Backend ini dibangun dengan prinsip modularitas, pengamanan berlapis (RBAC, IDOR
 
 ## Prasyarat
 
-- Node.js >= 20.9.0
+- Node.js >= 22.12.0
 - npm >= 10.0.0
 - Docker Desktop (opsional, untuk menjalankan PostgreSQL via container)
 
