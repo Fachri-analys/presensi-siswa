@@ -2,8 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, "feature/**", "codex/**"]
+    branches: [main, production-ready, "feature/**"]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -12,6 +18,7 @@ jobs:
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,6 +31,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Security audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Lint frontend
         run: npm run lint
@@ -40,12 +50,10 @@ jobs:
       - name: Build frontend container
         run: docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.invalid/api/v1/ -t presensi-frontend:ci .
 
-      - name: Security audit dependencies
-        run: npm audit --audit-level=high
-
   backend:
     name: Backend (NestJS + Prisma)
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16-alpine
@@ -81,6 +89,10 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      - name: Security audit backend dependencies
+        run: npm audit --audit-level=high
+        working-directory: backend
+
       - name: Generate Prisma client
         run: npx prisma generate
         working-directory: backend
@@ -107,10 +119,6 @@ jobs:
 
       - name: Run backend e2e tests
         run: npm run test:e2e
-        working-directory: backend
-
-      - name: Security audit backend dependencies
-        run: npm audit --audit-level=high
         working-directory: backend
 
       - name: Build NestJS application
