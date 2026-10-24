@@ -1,11 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { AuditResult, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryAuditLogDto } from './dto/query-audit-log.dto';
-import { Prisma } from '@prisma/client';
+
+export interface AuditLogInput {
+  actorId?: string | null;
+  action: string;
+  objectType: string;
+  objectId?: string | null;
+  result: AuditResult;
+  metadata?: Record<string, unknown> | null;
+  requestId?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
 
 @Injectable()
 export class AuditLogsService {
+  private readonly logger = new Logger(AuditLogsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Tulis audit log di luar transaksi bisnis. Tidak pernah throw:
+   * kegagalan audit tidak boleh menggagalkan aksi utama.
+   */
+  async log(input: AuditLogInput): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: input.actorId ?? null,
+          action: input.action,
+          objectType: input.objectType,
+          objectId: input.objectId ?? null,
+          result: input.result,
+          // Round-trip JSON supaya Date/undefined di metadata jadi JSON valid.
+          metadata: input.metadata
+            ? (JSON.parse(JSON.stringify(input.metadata)) as Prisma.InputJsonValue)
+            : undefined,
+          requestId: input.requestId ?? null,
+          ipAddress: input.ipAddress ?? null,
+          userAgent: input.userAgent ?? null,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Gagal menulis audit log: ${input.action} ${input.objectType}`,
+        err as Error,
+      );
+    }
+  }
 
   async findAll(query: QueryAuditLogDto) {
     const page = Math.max(1, Number(query.page ?? 1));
