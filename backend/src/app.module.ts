@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
+import { StatsModule } from './modules/stats/stats.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
@@ -26,7 +27,6 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { AuthGuard } from './common/guards/auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
-import { CsrfGuard } from './common/guards/csrf.guard';
 
 @Module({
   imports: [
@@ -56,6 +56,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     AuditLogsModule,
     ReportsModule,
     SchedulesModule,
+    StatsModule,
   ],
   providers: [
     {
@@ -77,10 +78,6 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: CsrfGuard,
     },
     {
       provide: APP_GUARD,
