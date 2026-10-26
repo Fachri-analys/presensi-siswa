@@ -120,7 +120,7 @@ jobs:
 
       - name: Create restricted runtime database role
         run: |
-          docker cp backend/scripts/ensure-runtime-db-user.sh "${{ job.services.postgres.id }}:/tmp/ensure-runtime-db-user.sh"
+          docker cp scripts/ensure-runtime-db-user.sh "${{ job.services.postgres.id }}:/tmp/ensure-runtime-db-user.sh"
           docker exec \
             -e POSTGRES_HOST=localhost \
             -e POSTGRES_USER="$POSTGRES_USER" \
