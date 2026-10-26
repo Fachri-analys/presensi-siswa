@@ -47,6 +47,13 @@ jobs:
       - name: Build Next.js application
         run: npm run build
 
+      - name: Validate production Compose configuration
+        run: |
+          cp .env.production.example .env.production
+          bash -n scripts/deploy-production.sh scripts/backup-production.sh
+          docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
+          rm .env.production
+
       - name: Build frontend container
         run: docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.invalid/api/v1/ -t presensi-frontend:ci .
 

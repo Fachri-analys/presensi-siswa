@@ -119,6 +119,8 @@ docker run -d \
 
 Gunakan backup terjadwal dari penyedia PostgreSQL atau `pg_dump` dengan kredensial dari secret manager. Pulihkan backup ke database staging kosong untuk menguji proses pemulihan; jangan gunakan database produksi sebagai target uji.
 
+Untuk deployment Compose repository ini, jalankan `../scripts/backup-production.sh`; konfigurasi server dan prosedur pemulihan staging ada di [`../docs/PRODUCTION-SETUP.md`](../docs/PRODUCTION-SETUP.md).
+
 ```bash
 pg_dump --host="$PGHOST" --username="$PGUSER" --dbname="$PGDATABASE" --format=custom --file="presensi_$(date +%Y%m%d_%H%M%S).dump"
 pg_restore --host="$STAGING_PGHOST" --username="$STAGING_PGUSER" --dbname="$STAGING_PGDATABASE" --no-owner "presensi_YYYYMMDD_HHMMSS.dump"

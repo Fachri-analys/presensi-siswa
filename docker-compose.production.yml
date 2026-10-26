@@ -1,0 +1,129 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.production}
+      TZ: Asia/Jakarta
+      PGTZ: Asia/Jakarta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [presensi]
+
+  migrate:
+    image: presensi-migrate:${RELEASE_TAG:-local}
+    build:
+      context: ./backend
+      target: builder
+    restart: "no"
+    env_file: ${APP_ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    command: ["npm", "run", "prisma:migrate:deploy"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [presensi]
+
+  api:
+    image: presensi-api:${RELEASE_TAG:-local}
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      CORS_ORIGINS: https://${DOMAIN}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [presensi]
+
+  web:
+    image: presensi-web:${RELEASE_TAG:-local}
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?Set PUBLIC_API_BASE_URL in .env.production}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [presensi]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: [edge]
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks: [presensi]
+
+  seed:
+    image: presensi-migrate:${RELEASE_TAG:-local}
+    build:
+      context: ./backend
+      target: builder
+    profiles: [setup]
+    env_file: ${APP_ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    command: ["npm", "run", "prisma:seed"]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [presensi]
+
+volumes:
+  postgres_data:
+    name: ${VOLUME_PREFIX:-presensi}_postgres_data
+  uploads_data:
+    name: ${VOLUME_PREFIX:-presensi}_uploads_data
+  caddy_data:
+    name: ${VOLUME_PREFIX:-presensi}_caddy_data
+  caddy_config:
+    name: ${VOLUME_PREFIX:-presensi}_caddy_config
+
+networks:
+  presensi:
+    driver: bridge

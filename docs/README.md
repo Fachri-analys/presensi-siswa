@@ -9,6 +9,7 @@ Dokumentasi spesifikasi produk, sistem, arsitektur, dan integrasi API untuk Sist
 | [SRS.md](./SRS.md) | Persyaratan sistem fungsional, nonfungsional, keamanan, dan kriteria penerimaan. |
 | [API-CONTRACT.md](./API-CONTRACT.md) | Spesifikasi lengkap resource, endpoint, payload request/response, kode error, dan autentikasi API. |
 | [BACKEND-HANDOFF.md](./BACKEND-HANDOFF.md) | Panduan arsitektur backend, keputusan desain database, eager loading, dan checklist integrasi. |
+| [PRODUCTION-SETUP.md](./PRODUCTION-SETUP.md) | Setup server production, deploy, bootstrap admin, backup, pemulihan staging, dan rollback. |
 
 Panduan alur kontribusi dan standar kode repository ada di [../CONTRIBUTING.md](../CONTRIBUTING.md).
 

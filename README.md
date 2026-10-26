@@ -98,26 +98,18 @@ GitHub Actions menjalankan lint, typecheck, test, audit dependensi, dan build un
 
 ## Docker Produksi
 
-Build backend dan migrasikan database produksi sebelum mengganti image yang berjalan:
+Deployment satu server memakai Docker Compose, PostgreSQL privat, API dan frontend pada loopback, serta Caddy untuk HTTPS otomatis. Siapkan DNS, firewall, dan rahasia di server, lalu ikuti [panduan setup production](./docs/PRODUCTION-SETUP.md):
 
 ```bash
-docker build -t presensi-backend:latest ./backend
-npm --prefix backend run prisma:migrate:deploy
-docker run -d --name presensi-api --restart unless-stopped -p 4000:4000 --env-file backend/.env -v presensi_uploads:/app/uploads presensi-backend:latest
+cp .env.production.example .env.production
+chmod 600 .env.production
+# Isi nilai production di .env.production, lalu:
+./scripts/deploy-production.sh
 ```
 
-Build URL API frontend sebagai argumen build dan jalankan image:
+Backup database dan berkas unggahan dapat dijalankan dengan `./scripts/backup-production.sh`. Panduan setup menjelaskan bootstrap admin, verifikasi, jadwal backup, uji restore di staging, dan rollback aplikasi.
 
-```bash
-docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.domain-sekolah.sch.id/api/v1/ -t presensi-frontend:latest .
-docker run -d --name presensi-web --restart unless-stopped -p 3000:3000 presensi-frontend:latest
-```
-
-Gunakan HTTPS untuk API publik dan simpan konfigurasi backend di secret manager atau environment yang aman. `backend/.env` harus berisi `DATABASE_URL` production yang benar serta kalender sekolah melalui `SCHOOL_WORKING_DAYS` dan `SCHOOL_HOLIDAYS`. Volume `presensi_uploads` menyimpan lampiran saat container dibuat ulang. Gunakan satu replica backend selama berkas masih disimpan di volume lokal; skala horizontal memerlukan penyimpanan berkas dan rate limiter bersama.
-
-Cadangkan PostgreSQL dan volume `presensi_uploads` secara terjadwal. Uji pemulihan hanya ke database dan volume staging kosong; jangan gunakan data operasional sebagai target uji. [Panduan backend](./backend/README.md#backup--restore-database-dan-berkas) memuat contoh backup volume.
-
-GitHub Actions saat ini memvalidasi kode dan membangun image Docker; deployment tetap dilakukan manual karena target hosting dan rahasia deployment belum dikonfigurasi di repository.
+GitHub Actions memvalidasi kode, image, dan konfigurasi Compose. Deployment tetap dijalankan operator di server setelah domain dan rahasia production disiapkan.
 
 ## Dokumentasi
 
@@ -125,5 +117,6 @@ GitHub Actions saat ini memvalidasi kode dan membangun image Docker; deployment 
 - [Dokumentasi produk dan sistem](./docs/README.md)
 - [Kontrak API](./docs/API-CONTRACT.md)
 - [Panduan backend](./backend/README.md)
+- [Setup production](./docs/PRODUCTION-SETUP.md)
 
 Hak Cipta © 2026 SMK Negeri 11 Jakarta. Dikembangkan untuk keperluan operasional internal sekolah.
