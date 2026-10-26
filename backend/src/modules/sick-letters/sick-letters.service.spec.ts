@@ -115,7 +115,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
     };
 
     mockPrisma.student.findFirst.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
-    mockPrisma.sickLetter.create.mockImplementation((args) => Promise.resolve(args.data));
+    mockPrisma.sickLetter.create.mockImplementation((args: { data: Record<string, unknown> }) => Promise.resolve(args.data));
 
     const result = await service.uploadFile(
       { date: '2026-10-16', kelasId: 'cls-1', studentId: 'std-1', keterangan: 'Sakit' },
@@ -144,7 +144,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
     };
     const key = '11111111-1111-4111-8111-111111111111';
     mockPrisma.student.findFirst.mockResolvedValue({ id: 'std-1', kelasId: 'cls-1' });
-    mockPrisma.sickLetter.create.mockImplementation((args) => Promise.resolve({
+    mockPrisma.sickLetter.create.mockImplementation((args: { data: Record<string, unknown> }) => Promise.resolve({
       id: 'letter-1',
       ...args.data,
       createdAt: new Date('2026-10-16T00:00:00.000Z'),
