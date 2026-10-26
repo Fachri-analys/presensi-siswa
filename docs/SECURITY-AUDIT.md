@@ -2,9 +2,9 @@
 
 **Tanggal:** 26 Oktober 2026  
 **Cakupan:** repository Next.js/NestJS/Prisma, API, autentikasi/otorisasi, schema/migrasi, dependency lockfile, CI, Docker Compose, dan skrip deploy/backup.  
-**Kesimpulan saat audit:** **NOT READY FOR PRODUCTION** sampai validasi CI terbaru, setup server, kebijakan retensi, serta uji backup/restore production selesai.
+**Kesimpulan:** **NOT READY FOR PRODUCTION**. Perbaikan kode dan seluruh job CI pada commit `9834ffa` lulus; kesiapan server production, kebijakan retensi, serta uji backup/restore masih belum dibuktikan.
 
-Audit menelusuri source dan alur browser → API client → endpoint NestJS → guard/service → Prisma/PostgreSQL, serta konfigurasi CI dan Compose. Pemeriksaan dependency lokal tidak dapat menghubungi npm registry dari desktop; workflow CI sebelumnya berhasil menjalankan `npm audit --audit-level=high`. Tidak ada akses ke server/domain production, database berisi data operasional, atau secret manager, sehingga aspek tersebut tidak dinyatakan telah diuji.
+Audit menelusuri source dan alur browser → API client → endpoint NestJS → guard/service → Prisma/PostgreSQL, serta konfigurasi CI dan Compose. Run GitHub Actions [40347013642](https://github.com/Fachri-analys/presensi-siswa/actions/runs/40347013642) pada commit `9834ffa` lulus untuk frontend dan backend, termasuk kedua `npm audit --audit-level=high`, migrasi, role database runtime, E2E, Compose, dan image build. Audit dependency lokal tetap tidak dapat menghubungi npm registry dari desktop. Tidak ada akses ke server/domain production, database berisi data operasional, atau secret manager, sehingga aspek tersebut tidak dinyatakan telah diuji.
 
 ## 40 pemeriksaan
 
@@ -31,7 +31,7 @@ Audit menelusuri source dan alur browser → API client → endpoint NestJS → 
 | 19 | IDOR presensi | LULUS | Service memeriksa kelas pada baca, ubah, dan hapus; batch Ketua Kelas membatasi kelas dan tanggal. | — |
 | 20 | IDOR laporan | LULUS | Laporan kelas dan siswa memverifikasi kelas Ketua Kelas; rentang dibatasi. | — |
 | 21 | IDOR surat sakit | LULUS | Daftar, unggah, dan unduh mengecek cakupan kelas Ketua Kelas; file tidak diakses hanya dengan path. | — |
-| 22 | Hak Guru Piket/Ketua/Admin | DITAMBAH TES | Decorator route menegakkan akses; E2E diperluas: Admin/Guru/Ketua pada endpoint akun dan Guru read-vs-write siswa. Hasil E2E menunggu CI karena perlu PostgreSQL. | — |
+| 22 | Hak Guru Piket/Ketua/Admin | LULUS | E2E CI lulus: Admin/Guru/Ketua pada endpoint akun, Guru read-vs-write siswa, Ketua hanya melihat kelasnya, dan Ketua tanpa kelas ditolak. | — |
 | 23 | Mass assignment | LULUS | `ValidationPipe` global memakai `whitelist`, `forbidNonWhitelisted`, dan transform; field tak dikenal ditolak. | — |
 | 24 | Validasi enum, format, tanggal, dan nilai | LULUS | DTO memvalidasi role/status, format waktu, tanggal, UUID idempotensi, dan batas angka; service mengecek rentang tanggal secara semantik. | — |
 | 25 | Pagination dan batas rentang | LULUS | Page/limit dibatasi; laporan, statistik, riwayat presensi maksimal 366 hari. | — |
@@ -48,7 +48,7 @@ Audit menelusuri source dan alur browser → API client → endpoint NestJS → 
 | 36 | Audit aksi sensitif | LULUS DENGAN BATASAN | Perubahan penting dan ekspor dicatat. Kegagalan penyimpanan audit dilog tetapi tidak membatalkan aksi utama; log berada pada DB aplikasi, bukan penyimpanan immutable terpisah. | P2 bila butuh bukti tamper-proof |
 | 37 | Retensi dan penghapusan PII | PERLU KEPUTUSAN | Data siswa, presensi, metadata audit, dan lampiran tidak punya TTL/penghapusan otomatis. Sekolah harus menetapkan masa simpan dan mekanisme penghapusan termasuk backup. | P2 operasional |
 | 38 | Secret dan file environment | LULUS SEBAGIAN | File environment nyata di-ignore; file yang dilacak adalah template. Pemindaian pola pada working tree tidak menemukan private key/token umum; seluruh sejarah Git tidak dipindai dengan secret scanner khusus. | P2 sampai history scan |
-| 39 | Dependency dan supply chain | MENUNGGU CI TERBARU | Lockfile dipakai dengan `npm ci`; CI menjalankan audit high. Audit lokal gagal menghubungi registry, dan base image memakai tag yang dapat berubah. Jangan anggap scan dependency terbaru selesai sebelum run CI audit ini hijau. | P2 verifikasi |
+| 39 | Dependency dan supply chain | LULUS DENGAN CATATAN | Pada run CI [40347013642](https://github.com/Fachri-analys/presensi-siswa/actions/runs/40347013642), `npm ci` dan `npm audit --audit-level=high` lulus untuk frontend/backend. Base image masih memakai tag yang dapat berubah, bukan digest. | P2 supply chain |
 | 40 | Database dan container production | DIPERBAIKI + CATATAN | API sebelumnya memakai `POSTGRES_USER`, yang pada image resmi PostgreSQL memiliki hak superuser. Kini API memakai role runtime terpisah tanpa superuser/CREATE schema; migrasi dan seed tetap memakai akun bootstrap. E2E CI memeriksa privilege sebenarnya. Container app berjalan non-root, tetapi belum read-only/cap-drop/resource-limited dan image belum dipin digest. | P1 sebelum fix; P2 hardening lanjut |
 
 ## Temuan terkonfirmasi dan perbaikan
@@ -62,13 +62,12 @@ Audit menelusuri source dan alur browser → API client → endpoint NestJS → 
 
 - **Frontend:** lint selesai tanpa error (1 warning lama `window.location.href`); typecheck lulus; 53 test lulus; build production lulus.
 - **Backend:** typecheck lulus; 89 unit test lulus; build lulus; lint tanpa error (17 warning `any` lama pada test/service/interceptor).
-- **E2E dan migrasi:** tidak dapat dijalankan lokal karena Docker/PostgreSQL tidak tersedia. Workflow CI disiapkan untuk migrasi PostgreSQL, role runtime terbatas, test permission per role, E2E, dan image build; hasil run untuk commit audit harus diperiksa sebelum sign-off.
+- **E2E dan migrasi:** tidak dapat dijalankan lokal karena Docker/PostgreSQL tidak tersedia. Pada [run CI 40347013642](https://github.com/Fachri-analys/presensi-siswa/actions/runs/40347013642), migrasi PostgreSQL, pembuatan role runtime terbatas, verifikasi permission, E2E seluruh peran, dan image build backend lulus.
 - **Audit dependency lokal:** registry npm tidak dapat dihubungi dari desktop. Tidak ada dependency baru atau perubahan lockfile.
 - **Diff dan secret scan working tree:** `git diff --check` lulus; pemindaian pola credential/private key yang umum tidak menemukan secret di working tree.
 
 ## Yang masih menghalangi status READY
 
-- CI terbaru harus hijau, terutama migrasi, privilege role database, E2E hak peran, dependency audit, Compose dan image build.
 - Operator perlu mengisi domain, DNS, firewall, secret production, bootstrap Admin, dan menjalankan deploy pertama.
 - Sekolah perlu menetapkan retensi/penghapusan surat sakit, data siswa, presensi, dan audit.
 - Jadwal backup offsite terenkripsi dan uji restore staging belum dilakukan pada server.
