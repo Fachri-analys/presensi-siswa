@@ -15,6 +15,9 @@ async function main() {
   if (password && password.length < 12) {
     throw new Error('INITIAL_ADMIN_PASSWORD minimal 12 karakter.');
   }
+  if (password && Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error('INITIAL_ADMIN_PASSWORD maksimal 72 byte UTF-8.');
+  }
 
   const rounds = Number(process.env.BCRYPT_ROUNDS ?? 12);
   if (!Number.isInteger(rounds) || rounds < 10 || rounds > 15) {

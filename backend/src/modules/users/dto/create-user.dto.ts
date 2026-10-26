@@ -1,6 +1,7 @@
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { MaxUtf8Bytes } from '../../../common/validators/max-utf8-bytes.decorator';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Guru Piket 1' })
@@ -24,5 +25,6 @@ export class CreateUserDto {
   @ApiProperty({ example: 'SandiAwalYangPanjang!' })
   @IsString()
   @MinLength(12)
+  @MaxUtf8Bytes(72)
   password!: string;
 }

@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import { SessionCleanupService } from './common/services/session-cleanup.service';
+import { configureTrustedProxy } from './common/utils/trusted-proxy';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -18,6 +19,10 @@ async function bootstrap() {
   const port = config.get<number>('app.port', 4000);
   const nodeEnv = config.get<string>('app.nodeEnv', 'development');
   const corsOrigins = config.get<string[]>('app.corsOrigins', []);
+
+  // Production traffic arrives through the single Caddy proxy in Compose.
+  // Trust only that one hop so throttling uses the originating client IP.
+  configureTrustedProxy(app.getHttpAdapter().getInstance(), nodeEnv);
 
   // Security headers
   app.use(

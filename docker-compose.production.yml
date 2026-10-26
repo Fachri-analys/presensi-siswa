@@ -18,6 +18,25 @@ services:
       start_period: 10s
     networks: [presensi]
 
+  db-init:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.production}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:?Set POSTGRES_APP_USER in .env.production}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env.production}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - ./scripts/ensure-runtime-db-user.sh:/scripts/ensure-runtime-db-user.sh:ro
+    entrypoint: ["sh", "/scripts/ensure-runtime-db-user.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [presensi]
+
   migrate:
     image: presensi-migrate:${RELEASE_TAG:-local}
     build:
@@ -31,6 +50,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks: [presensi]
 
   api:
@@ -40,7 +61,7 @@ services:
     restart: unless-stopped
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       CORS_ORIGINS: https://${DOMAIN}
     volumes:
       - uploads_data:/app/uploads
@@ -49,6 +70,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
     networks: [presensi]

@@ -52,6 +52,16 @@ export const validationSchema = Joi.object({
       'any.required': 'DATABASE_URL wajib diisi (contoh: postgresql://user:pass@localhost:5432/db)',
     }),
   }),
+  POSTGRES_APP_USER: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().pattern(/^[a-z_][a-z0-9_]*$/i).required(),
+    otherwise: Joi.string().optional(),
+  }),
+  POSTGRES_APP_PASSWORD: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().min(32).pattern(/^[A-Za-z0-9_.~-]+$/).required(),
+    otherwise: Joi.string().optional(),
+  }),
 
   // Session
   SESSION_COOKIE_NAME: Joi.string().default('presensi_session'),

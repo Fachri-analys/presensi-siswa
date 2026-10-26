@@ -44,6 +44,7 @@ cp .env.example .env
 Variabel utama yang dikonfigurasi:
 - `PORT`: Port server backend (default: `4000`).
 - `DATABASE_URL`: URL koneksi PostgreSQL (contoh: `postgresql://postgres:postgres@localhost:5432/presensi_db?schema=public`).
+- Pada Compose production, akun `POSTGRES_USER` dipakai untuk migrasi dan seed; API menggunakan `POSTGRES_APP_USER` terpisah dengan hak runtime minimum.
 - `CORS_ORIGINS`: Daftar origin frontend yang diizinkan (contoh lokal: `http://localhost:3000`); wajib diisi dengan origin HTTPS di production.
 - `UPLOAD_DIR`: Direktori penyimpanan berkas surat izin/sakit (default: `./uploads`).
 - `SCHOOL_WORKING_DAYS`: Hari efektif ISO, Senin=`1` sampai Minggu=`7` (default: `1,2,3,4,5`).
@@ -150,4 +151,4 @@ Hari efektif default menghitung Senin–Jumat. Masukkan hari libur dan perubahan
 
 Seed hanya membuat jadwal presensi dan, bila diminta, akun Admin pertama. Atur `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` secara lokal sebelum menjalankan seed. Keduanya wajib diisi bersama; password minimal 12 karakter. Seed tidak membuat akun, kelas, guru, atau siswa contoh, dan tidak mengubah password Admin yang sudah ada.
 
-Test end-to-end memakai database terisolasi bernama `presensi_test`. Set `NODE_ENV=test`, arahkan `DATABASE_URL` ke database tersebut, isi `TEST_ADMIN_PASSWORD` dan `TEST_KETUA_PASSWORD` (minimal 12 karakter), lalu jalankan `npm run prisma:seed:e2e` sebelum `npm run test:e2e`. Fixture menolak database lain agar tidak menyentuh data operasional.
+Test end-to-end memakai database terisolasi bernama `presensi_test`. Set `NODE_ENV=test`, arahkan `DATABASE_URL` ke database tersebut, isi `TEST_ADMIN_PASSWORD`, `TEST_GURU_PASSWORD`, dan `TEST_KETUA_PASSWORD` (minimal 12 karakter), lalu jalankan `npm run prisma:seed:e2e` sebelum `npm run test:e2e`. Fixture menolak database lain agar tidak menyentuh data operasional.

@@ -19,7 +19,7 @@ cp .env.production.example .env.production
 chmod 600 .env.production
 ```
 
-Isi `DOMAIN`, `PUBLIC_API_BASE_URL`, `POSTGRES_PASSWORD`, kalender sekolah, dan nilai admin awal. Gunakan password database acak yang hanya berisi huruf/angka agar aman di URL koneksi. Contoh pembuatannya: `openssl rand -hex 32`. Pastikan `PUBLIC_API_BASE_URL` memakai domain yang sama, misalnya `https://presensi.sekolah.sch.id/api/v1/`.
+Isi `DOMAIN`, `PUBLIC_API_BASE_URL`, `POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, kalender sekolah, dan nilai admin awal. Gunakan password acak URL-safe (misalnya `openssl rand -hex 32`) untuk kedua akun database. `POSTGRES_USER` adalah akun bootstrap khusus migrasi/seed; API berjalan memakai akun `POSTGRES_APP_USER` terpisah yang otomatis dibuat tanpa hak superuser dan tanpa hak membuat schema. Pastikan `PUBLIC_API_BASE_URL` memakai domain yang sama, misalnya `https://presensi.sekolah.sch.id/api/v1/`.
 
 Sebelum deploy, arahkan DNS domain ke server dan izinkan inbound 80/443 pada firewall. Lalu jalankan:
 
@@ -29,7 +29,7 @@ Sebelum deploy, arahkan DNS domain ke server dan izinkan inbound 80/443 pada fir
 
 Script memvalidasi Compose, membangun image dengan tag commit, menjalankan migrasi database, dan memulai Caddy/API/frontend. Caddy menerbitkan sertifikat TLS otomatis setelah DNS dan port dapat dijangkau.
 
-Untuk membuat admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` pada `.env.production`, lalu jalankan sekali:
+Untuk membuat admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` pada `.env.production` (password minimal 12 karakter dan maksimal 72 byte UTF-8), lalu jalankan sekali:
 
 ```sh
 docker compose --env-file .env.production -f docker-compose.production.yml --profile setup run --rm seed

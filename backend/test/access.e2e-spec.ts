@@ -9,6 +9,10 @@ import { loginAndGetCookie } from './helpers/auth.helper';
 describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let adminCookies: string[];
+  let guruCookies: string[];
+  let ketuaCookies: string[];
+  let ketuaNullCookies: string[];
   const requireTestPassword = (name: string) => {
     const value = process.env[name];
     if (!value) throw new Error(`${name} wajib diatur untuk menjalankan E2E test.`);
@@ -38,6 +42,26 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
 
     await app.init();
     prisma = app.get(PrismaService);
+    adminCookies = await loginAndGetCookie(
+      app,
+      'admin.test@smkn11jakarta.sch.id',
+      requireTestPassword('TEST_ADMIN_PASSWORD'),
+    );
+    guruCookies = await loginAndGetCookie(
+      app,
+      'guru.test@smkn11jakarta.sch.id',
+      requireTestPassword('TEST_GURU_PASSWORD'),
+    );
+    ketuaCookies = await loginAndGetCookie(
+      app,
+      'ketua.test@smkn11jakarta.sch.id',
+      requireTestPassword('TEST_KETUA_PASSWORD'),
+    );
+    ketuaNullCookies = await loginAndGetCookie(
+      app,
+      'ketua.nokelas@smkn11jakarta.sch.id',
+      requireTestPassword('TEST_KETUA_PASSWORD'),
+    );
   });
 
   afterAll(async () => {
@@ -46,13 +70,24 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     }
   });
 
-  it('Admin GET /students = 200', async () => {
-    const adminCookies = await loginAndGetCookie(
-      app,
-      'admin.test@smkn11jakarta.sch.id',
-      requireTestPassword('TEST_ADMIN_PASSWORD'),
-    );
+  it('API memakai role database tanpa hak superuser atau CREATE schema', async () => {
+    const [role] = await prisma.$queryRaw<Array<{
+      isSuperuser: boolean;
+      canCreateSchema: boolean;
+      canReadUsers: boolean;
+    }>>`
+      SELECT
+        role.rolsuper AS "isSuperuser",
+        has_schema_privilege(current_user, 'public', 'CREATE') AS "canCreateSchema",
+        has_table_privilege(current_user, 'public.users', 'SELECT') AS "canReadUsers"
+      FROM pg_roles role
+      WHERE role.rolname = current_user
+    `;
 
+    expect(role).toEqual({ isSuperuser: false, canCreateSchema: false, canReadUsers: true });
+  });
+
+  it('Admin GET /students = 200', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/students')
       .set('Cookie', adminCookies);
@@ -60,13 +95,37 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     expect(response.status).toBe(200);
   });
 
-  it('Ketua A GET students/:idKelasB = 403', async () => {
-    const ketuaACookies = await loginAndGetCookie(
-      app,
-      'ketua.test@smkn11jakarta.sch.id',
-      requireTestPassword('TEST_KETUA_PASSWORD'),
-    );
+  it('Guru Piket dapat membaca siswa tetapi tidak dapat membuat data siswa', async () => {
+    const readResponse = await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .set('Cookie', guruCookies);
+    const writeResponse = await request(app.getHttpServer())
+      .post('/api/v1/students')
+      .set('Cookie', guruCookies)
+      .set('Origin', 'http://localhost:3000')
+      .send({ nis: 'should-not-write', nama: 'Blocked', kelasId: 'missing' });
 
+    expect(readResponse.status).toBe(200);
+    expect(writeResponse.status).toBe(403);
+  });
+
+  it('Admin mengelola akun; Guru Piket dan Ketua Kelas ditolak dari endpoint akun', async () => {
+    const adminResponse = await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Cookie', adminCookies);
+    const guruResponse = await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Cookie', guruCookies);
+    const ketuaResponse = await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Cookie', ketuaCookies);
+
+    expect(adminResponse.status).toBe(200);
+    expect(guruResponse.status).toBe(403);
+    expect(ketuaResponse.status).toBe(403);
+  });
+
+  it('Ketua A GET students/:idKelasB = 403', async () => {
     const studentInKelasB = await prisma.student.findUnique({
       where: { nis: 'e2e-student-kelas-b' },
     });
@@ -74,22 +133,29 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
 
     const response = await request(app.getHttpServer())
       .get(`/api/v1/students/${studentInKelasB!.id}`)
-      .set('Cookie', ketuaACookies);
+      .set('Cookie', ketuaCookies);
 
     expect(response.status).toBe(403);
   });
 
   it('Ketua kelasId null GET students = 403', async () => {
-    const ketuaNullCookies = await loginAndGetCookie(
-      app,
-      'ketua.nokelas@smkn11jakarta.sch.id',
-      requireTestPassword('TEST_KETUA_PASSWORD'),
-    );
-
     const response = await request(app.getHttpServer())
       .get('/api/v1/students')
       .set('Cookie', ketuaNullCookies);
 
     expect(response.status).toBe(403);
+  });
+
+  it('Ketua Kelas dapat membaca siswa kelasnya sendiri', async () => {
+    const ketua = await prisma.user.findUnique({
+      where: { email: 'ketua.test@smkn11jakarta.sch.id' },
+      select: { kelasId: true },
+    });
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .query({ kelasId: ketua?.kelasId })
+      .set('Cookie', ketuaCookies);
+
+    expect(response.status).toBe(200);
   });
 });

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MinLength } from 'class-validator';
+import { MaxUtf8Bytes } from '../../../common/validators/max-utf8-bytes.decorator';
 
 export class LoginDto {
   @ApiProperty({ example: 'admin@smkn11jakarta.sch.id' })
@@ -9,5 +10,6 @@ export class LoginDto {
   @ApiProperty({ example: 'Admin#2026', minLength: 6 })
   @IsString()
   @MinLength(6, { message: 'Password minimal 6 karakter.' })
+  @MaxUtf8Bytes(72)
   password!: string;
 }

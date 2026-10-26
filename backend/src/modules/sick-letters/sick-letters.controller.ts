@@ -22,6 +22,14 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 
+export const SICK_LETTER_UPLOAD_LIMITS = {
+  fileSize: Number(process.env.UPLOAD_MAX_SIZE_BYTES ?? 5 * 1024 * 1024),
+  files: 1,
+  fields: 4,
+  fieldSize: 2048,
+  parts: 5,
+};
+
 @ApiTags('SickLetters')
 @ApiCookieAuth('session')
 @Controller('sick-letters')
@@ -32,7 +40,7 @@ export class SickLettersController {
   @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: Number(process.env.UPLOAD_MAX_SIZE_BYTES ?? 5 * 1024 * 1024) },
+      limits: SICK_LETTER_UPLOAD_LIMITS,
     }),
   )
   @ApiConsumes('multipart/form-data')

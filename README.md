@@ -53,7 +53,7 @@ cp .env.example .env.local
 cp backend/.env.example backend/.env
 ```
 
-Nilai default pada `backend/.env.example` ditujukan untuk database lokal. Untuk menyiapkan Admin awal, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env` sebelum menjalankan seed. Password minimal 12 karakter. Seed tidak membuat data contoh.
+Nilai default pada `backend/.env.example` ditujukan untuk database lokal. Untuk menyiapkan Admin awal, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env` sebelum menjalankan seed. Password minimal 12 karakter dan maksimal 72 byte UTF-8 (batas bcrypt). Seed tidak membuat data contoh.
 
 ### Database dan aplikasi
 

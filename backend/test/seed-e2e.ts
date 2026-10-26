@@ -3,20 +3,21 @@ import * as bcrypt from 'bcrypt';
 
 const databaseUrl = process.env.DATABASE_URL;
 const adminPassword = process.env.TEST_ADMIN_PASSWORD;
+const guruPassword = process.env.TEST_GURU_PASSWORD;
 const ketuaPassword = process.env.TEST_KETUA_PASSWORD;
 
 if (process.env.NODE_ENV !== 'test' || !databaseUrl || new URL(databaseUrl).pathname !== '/presensi_test') {
   throw new Error('Fixture E2E hanya boleh dijalankan pada database presensi_test dengan NODE_ENV=test.');
 }
-if (!adminPassword || adminPassword.length < 12 || !ketuaPassword || ketuaPassword.length < 12) {
-  throw new Error('TEST_ADMIN_PASSWORD dan TEST_KETUA_PASSWORD wajib diisi minimal 12 karakter.');
+if (!adminPassword || adminPassword.length < 12 || !guruPassword || guruPassword.length < 12 || !ketuaPassword || ketuaPassword.length < 12) {
+  throw new Error('TEST_ADMIN_PASSWORD, TEST_GURU_PASSWORD, dan TEST_KETUA_PASSWORD wajib diisi minimal 12 karakter.');
 }
 
 const prisma = new PrismaClient();
 
 async function main() {
-  if (!adminPassword || !ketuaPassword) {
-    throw new Error('TEST_ADMIN_PASSWORD dan TEST_KETUA_PASSWORD wajib diisi minimal 12 karakter.');
+  if (!adminPassword || !guruPassword || !ketuaPassword) {
+    throw new Error('TEST_ADMIN_PASSWORD, TEST_GURU_PASSWORD, dan TEST_KETUA_PASSWORD wajib diisi minimal 12 karakter.');
   }
 
   const kelasA = await prisma.class.upsert({
@@ -31,6 +32,7 @@ async function main() {
   });
 
   const adminHash = await bcrypt.hash(adminPassword, 10);
+  const guruHash = await bcrypt.hash(guruPassword, 10);
   const ketuaHash = await bcrypt.hash(ketuaPassword, 10);
   await prisma.user.upsert({
     where: { email: 'admin.test@smkn11jakarta.sch.id' },
@@ -40,6 +42,16 @@ async function main() {
       email: 'admin.test@smkn11jakarta.sch.id',
       passwordHash: adminHash,
       role: Role.ADMIN,
+    },
+  });
+  await prisma.user.upsert({
+    where: { email: 'guru.test@smkn11jakarta.sch.id' },
+    update: { passwordHash: guruHash, role: Role.GURU_PIKET, status: 'active', kelasId: null },
+    create: {
+      nama: 'Guru Piket E2E',
+      email: 'guru.test@smkn11jakarta.sch.id',
+      passwordHash: guruHash,
+      role: Role.GURU_PIKET,
     },
   });
   await prisma.user.upsert({
