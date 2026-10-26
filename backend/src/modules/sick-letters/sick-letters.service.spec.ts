@@ -18,11 +18,15 @@ describe('SickLettersService (Keamanan Upload File)', () => {
 
   beforeEach(async () => {
     mockPrisma = {
+      $transaction: jest.fn((callback) => callback(mockPrisma)),
       student: {
         findFirst: jest.fn(),
       },
       sickLetter: {
         create: jest.fn(),
+      },
+      attendance: {
+        upsert: jest.fn(),
       },
     };
 
@@ -95,7 +99,7 @@ describe('SickLettersService (Keamanan Upload File)', () => {
 
   // [SEC-06] File yang diunggah disanitasi namanya dengan UUID unik
   it('[SEC-06] uploadFile() menyimpan file dengan nama hash UUID unik untuk mencegah directory traversal', async () => {
-    const user = { id: 'usr-1', email: 'test@sch.id', nama: 'Ketua', role: Role.KETUA_KELAS, kelasId: 'cls-1' };
+    const user = { id: 'usr-1', email: 'test@sch.id', nama: 'Guru Piket', role: Role.GURU_PIKET, kelasId: null };
     const validFile = {
       originalname: '../../../etc/passwd.png', // Percobaan path traversal
       mimetype: 'image/png',
@@ -115,5 +119,9 @@ describe('SickLettersService (Keamanan Upload File)', () => {
     expect(result.fileName).not.toContain('..');
     expect(result.fileName).toMatch(/^[0-9a-f-]+\.png$/i);
     expect(fs.writeFileSync).toHaveBeenCalled();
+    expect(mockPrisma.attendance.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ status: 'SAKIT' }),
+      update: expect.objectContaining({ status: 'SAKIT' }),
+    }));
   });
 });

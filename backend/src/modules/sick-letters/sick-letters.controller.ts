@@ -4,11 +4,14 @@ import {
   Get,
   Param,
   Post,
+  Header,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiConsumes, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { createReadStream } from 'node:fs';
 import { SickLettersService, type UploadFile } from './sick-letters.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -37,6 +40,18 @@ export class SickLettersController {
     @CurrentUser() user: SessionUser,
   ) {
     return this.sickLettersService.uploadFile(dto, file, user);
+  }
+
+  @Get(':id/file')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Roles(Role.ADMIN, Role.GURU_PIKET, Role.KETUA_KELAS)
+  async getFile(@Param('id') id: string, @CurrentUser() user: SessionUser) {
+    const file = await this.sickLettersService.getFile(id, user);
+    return new StreamableFile(createReadStream(file.filePath), {
+      type: file.mimeType,
+      disposition: `attachment; filename="${file.fileName}"`,
+    });
   }
 
   @Get('class/:kelasId')

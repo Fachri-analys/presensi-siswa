@@ -6,9 +6,11 @@ import { ActiveStatus, AttendanceSession, AttendanceStatus, Role } from '@prisma
 
 // Default mock nowWibTime ke jam 08:00 (dalam window sesi PAGI default)
 const mockNowWibTime = jest.fn().mockReturnValue('08:00');
+const mockTodayWib = jest.fn().mockReturnValue('2026-10-16');
 jest.mock('../../common/utils/time.util', () => ({
   ...jest.requireActual('../../common/utils/time.util'),
   nowWibTime: (...args: any[]) => mockNowWibTime(...args),
+  todayWib: (...args: any[]) => mockTodayWib(...args),
 }));
 
 describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
@@ -28,6 +30,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
         groupBy: jest.fn(),
       },
       schedule: {
@@ -114,6 +117,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
 
     expect(result.length).toBe(2);
     expect(mockPrisma.attendance.upsert).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.attendance.deleteMany).not.toHaveBeenCalled();
     expect(mockPrisma.auditLog.create).toHaveBeenCalled();
   });
 
@@ -204,6 +208,36 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
   });
 
   // [B3-02] Ketua Kelas boleh mencatat IZIN/SAKIT/ALPA di luar window sesi
+  it('[SEC-ATT-01] menolak tanggal lampau/masa depan dari Ketua Kelas sebelum query database', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    await expect(
+      service.saveBatch(
+        { date: '2026-10-17', kelasId: 'cls-own', records: [] },
+        ketuaUser,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockPrisma.class.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('[SEC-ATT-02] Ketua Kelas tidak dapat mengganti seluruh presensi kelas', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS, kelasId: 'cls-own',
+    };
+    await expect(service.saveBatch(
+      { date: '2026-10-16', kelasId: 'cls-own', records: [], replace: true },
+      ketuaUser,
+    )).rejects.toThrow(ForbiddenException);
+    expect(mockPrisma.attendance.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('[B3-02] saveBatch() mengizinkan IZIN/SAKIT/ALPA dari Ketua Kelas di luar window sesi', async () => {
     const ketuaUser = {
       id: 'usr-ketua',
@@ -370,7 +404,7 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       { date: new Date('2026-10-02') },
     ]);
 
-    const recap = await service.getRecap({ kelasId: 'cls-1' }, user);
+    const recap = await service.getRecap({ kelasId: 'cls-1', from: '2026-10-16', to: '2026-10-19' }, user);
     expect(recap.rows.length).toBe(2);
     expect(recap.effectiveDays).toBe(2);
     expect(recap.rows[0].hadir).toBe(20); // 18 Hadir + 2 Terlambat

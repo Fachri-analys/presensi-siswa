@@ -58,6 +58,18 @@ export const validationSchema = Joi.object({
   SESSION_MAX_AGE_MS: Joi.number().integer().positive().default(28800000),
   SESSION_SAME_SITE: Joi.string().valid('lax', 'strict', 'none').default('lax'),
 
+  // School calendar (ISO weekdays: Monday=1 ... Sunday=7)
+  SCHOOL_WORKING_DAYS: Joi.string().pattern(/^[1-7](,[1-7])*$/).default('1,2,3,4,5'),
+  SCHOOL_HOLIDAYS: Joi.string().allow('').default('').custom((value, helpers) => {
+    const invalidDate = value.split(',').filter(Boolean).some((item: string) => {
+      const date = item.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return true;
+      const parsed = new Date(`${date}T00:00:00.000Z`);
+      return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date;
+    });
+    return invalidDate ? helpers.error('any.invalid') : value;
+  }),
+
   // Security
   BCRYPT_ROUNDS: Joi.number().integer().min(10).max(15).default(12),
 

@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus } from '@prisma/client';
@@ -6,15 +6,17 @@ import { ActiveStatus } from '@prisma/client';
 export class QueryStudentDto {
   @ApiPropertyOptional({ default: 1 })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(1000)
   @IsOptional()
   page?: number = 1;
 
   @ApiPropertyOptional({ default: 20 })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(100)
   @IsOptional()
   limit?: number = 20;
 

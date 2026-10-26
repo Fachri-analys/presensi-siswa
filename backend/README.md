@@ -8,7 +8,7 @@ Backend API resmi untuk Sistem Presensi Siswa SMK Negeri 11 Jakarta.
 
 ## Arsitektur & Modul
 
-Backend ini memakai modul domain terpisah dan pengamanan berlapis, termasuk RBAC, pemeriksaan akses objek, dan proteksi CSRF:
+Backend ini memakai modul domain terpisah dan pengamanan berlapis, termasuk RBAC, pemeriksaan akses objek, perlindungan CSRF berbasis Origin, serta transaksi untuk perubahan presensi dan unggah surat:
 
 | Modul | Endpoint Utama | Deskripsi & Otorisasi |
 | :--- | :--- | :--- |
@@ -16,9 +16,9 @@ Backend ini memakai modul domain terpisah dan pengamanan berlapis, termasuk RBAC
 | **Students** | `/api/v1/students` | CRUD data siswa, proteksi IDOR Ketua Kelas, pagination & search. |
 | **Classes** | `/api/v1/classes` | CRUD kelas, penetapan ketua kelas, eager loading jumlah siswa. |
 | **Teachers** | `/api/v1/teachers` | CRUD data guru piket dan guru pengajar, validasi NIP unik. |
-| **Attendance** | `/api/v1/attendance` | Batch save atomik (`$transaction`), riwayat tanggal, rekap kehadiran semester (`groupBy` agregasi DB), pengelolaan jadwal sesi presensi. |
+| **Attendance** | `/api/v1/attendance` | Batch simpan/ganti atomik (`$transaction`), riwayat dan rekap maksimal 366 hari, agregasi DB, pengelolaan jadwal sesi presensi. |
 | **Monitoring** | `/api/v1/monitoring` | Rekapitulasi kehadiran real-time seluruh kelas per tanggal via agregasi dual-query O(1). |
-| **Sick Letters** | `/api/v1/sick-letters` | Unggah surat izin/sakit dengan validasi MIME, batas 5MB, sanitasi UUID, dan proteksi IDOR. |
+| **Sick Letters** | `/api/v1/sick-letters` | Unggah surat sakit dengan validasi isi file dan ukuran, nama UUID, transaksi pembaruan presensi, serta endpoint unduh yang dibatasi role/kelas. |
 | **Users** | `/api/v1/users` | Pengelolaan akun pengguna, hashing bcrypt, perubahan password oleh Admin & invalidasi sesi. |
 | **Audit Logs** | `/api/v1/audit-logs` | Jejak audit aktivitas sistem dengan eager loading relasi aktor. |
 | **Health** | `/api/v1/health` | Healthcheck server dan status konektivitas database PostgreSQL. |
@@ -46,6 +46,8 @@ Variabel utama yang dikonfigurasi:
 - `DATABASE_URL`: URL koneksi PostgreSQL (contoh: `postgresql://postgres:postgres@localhost:5432/presensi_db?schema=public`).
 - `CORS_ORIGINS`: Daftar origin frontend yang diizinkan (contoh lokal: `http://localhost:3000`); wajib diisi dengan origin HTTPS di production.
 - `UPLOAD_DIR`: Direktori penyimpanan berkas surat izin/sakit (default: `./uploads`).
+- `SCHOOL_WORKING_DAYS`: Hari efektif ISO, Senin=`1` sampai Minggu=`7` (default: `1,2,3,4,5`).
+- `SCHOOL_HOLIDAYS`: Tanggal libur format `YYYY-MM-DD`, dipisahkan koma. Kosongkan bila tidak ada.
 
 ---
 
@@ -107,12 +109,13 @@ docker run -d \
   --name presensi-api \
   -p 4000:4000 \
   --env-file .env \
+  -v presensi_uploads:/app/uploads \
   presensi-backend:latest
 ```
 
 ---
 
-## Backup & Restore Database
+## Backup & Restore Database dan Berkas
 
 Gunakan backup terjadwal dari penyedia PostgreSQL atau `pg_dump` dengan kredensial dari secret manager. Pulihkan backup ke database staging kosong untuk menguji proses pemulihan; jangan gunakan database produksi sebagai target uji.
 
@@ -120,6 +123,24 @@ Gunakan backup terjadwal dari penyedia PostgreSQL atau `pg_dump` dengan kredensi
 pg_dump --host="$PGHOST" --username="$PGUSER" --dbname="$PGDATABASE" --format=custom --file="presensi_$(date +%Y%m%d_%H%M%S).dump"
 pg_restore --host="$STAGING_PGHOST" --username="$STAGING_PGUSER" --dbname="$STAGING_PGDATABASE" --no-owner "presensi_YYYYMMDD_HHMMSS.dump"
 ```
+
+Lampiran surat berada di volume Docker `presensi_uploads` pada contoh deployment root. Cadangkan juga volume tersebut; backup database saja tidak menyertakan isi berkas. Contoh berikut memakai direktori `backups` pada PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force backups
+docker run --rm -v presensi_uploads:/data:ro -v "${PWD}/backups:/backup" alpine tar -czf /backup/presensi_uploads.tar.gz -C /data .
+```
+
+Untuk uji pemulihan, gunakan volume baru dan lingkungan staging kosong:
+
+```powershell
+docker volume create presensi_uploads_restore
+docker run --rm -v presensi_uploads_restore:/data -v "${PWD}/backups:/backup" alpine tar -xzf /backup/presensi_uploads.tar.gz -C /data
+```
+
+Jalankan container staging dengan `-v presensi_uploads_restore:/app/uploads` dan database staging yang dipulihkan. Jangan mengekstrak backup ke volume production yang sedang dipakai. Simpan backup database dan berkas di lokasi terenkripsi dengan akses terbatas. Uji pemulihan berkala sebelum menganggap backup dapat dipakai.
+
+Hari efektif default menghitung Senin–Jumat. Masukkan hari libur dan perubahan hari sekolah pada `SCHOOL_HOLIDAYS` dan `SCHOOL_WORKING_DAYS` sebelum periode laporan dimulai.
 
 ---
 

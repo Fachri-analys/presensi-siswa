@@ -25,8 +25,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
+import { AuditTrailInterceptor } from './common/interceptors/audit-trail.interceptor';
 import { AuthGuard } from './common/guards/auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { CsrfGuard } from './common/guards/csrf.guard';
 
 @Module({
   imports: [
@@ -69,6 +71,10 @@ import { RolesGuard } from './common/guards/roles.guard';
     },
     {
       provide: APP_INTERCEPTOR,
+      useClass: AuditTrailInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
     },
     {
@@ -86,6 +92,10 @@ import { RolesGuard } from './common/guards/roles.guard';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
   ],
 })

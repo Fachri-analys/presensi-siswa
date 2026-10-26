@@ -6,11 +6,12 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
-import { Role } from '@prisma/client';
+import { AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { parseDateOnly, todayWib } from '../../common/utils/time.util';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -82,6 +83,11 @@ export class SickLettersService {
       throw new NotFoundException('Siswa tidak ditemukan pada kelas tersebut.');
     }
 
+    const recordDate = parseDateOnly(dto.date);
+    if (user.role === Role.KETUA_KELAS && dto.date !== todayWib()) {
+      throw new ForbiddenException('Ketua Kelas hanya dapat mengirim surat untuk tanggal hari ini.');
+    }
+
     // 4. Sanitasi nama file & cegah path traversal menggunakan hash unik
     const safeExt = file.mimetype === 'image/jpeg' ? '.jpg' : file.mimetype === 'image/png' ? '.png' : '.pdf';
     const randomName = `${crypto.randomUUID()}${safeExt}`;
@@ -90,34 +96,54 @@ export class SickLettersService {
     // Simpan buffer file secara aman
     fs.writeFileSync(destinationPath, file.buffer, { flag: 'wx', mode: 0o600 });
 
-    const recordDate = new Date(dto.date);
-
     // Simpan metadata ke database
     try {
-      return await this.prisma.sickLetter.create({
-        data: {
-        date: new Date(Date.UTC(recordDate.getUTCFullYear(), recordDate.getUTCMonth(), recordDate.getUTCDate())),
-        kelasId: dto.kelasId,
-        studentId: student.id,
-        keterangan: dto.keterangan,
-        fileName: randomName,
-        filePath: destinationPath,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-          uploadedById: user.id,
-        },
-        select: {
-          id: true,
-          date: true,
-          kelasId: true,
-          studentId: true,
-          keterangan: true,
-          fileName: true,
-          fileSize: true,
-          mimeType: true,
-          uploadedById: true,
-          createdAt: true,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const letter = await tx.sickLetter.create({
+          data: {
+            date: recordDate,
+            kelasId: dto.kelasId,
+            studentId: student.id,
+            keterangan: dto.keterangan,
+            fileName: randomName,
+            filePath: destinationPath,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            uploadedById: user.id,
+          },
+          select: {
+            id: true,
+            date: true,
+            kelasId: true,
+            studentId: true,
+            keterangan: true,
+            fileName: true,
+            fileSize: true,
+            mimeType: true,
+            uploadedById: true,
+            createdAt: true,
+          },
+        });
+        await tx.attendance.upsert({
+          where: { date_kelasId_studentId: { date: recordDate, kelasId: dto.kelasId, studentId: student.id } },
+          create: {
+            date: recordDate,
+            kelasId: dto.kelasId,
+            studentId: student.id,
+            status: AttendanceStatus.SAKIT,
+            waktu: null,
+            keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
+            createdById: user.id,
+            updatedById: user.id,
+          },
+          update: {
+            status: AttendanceStatus.SAKIT,
+            waktu: null,
+            keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
+            updatedById: user.id,
+          },
+        });
+        return letter;
       });
     } catch (error) {
       fs.rmSync(destinationPath, { force: true });
@@ -147,5 +173,19 @@ export class SickLettersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getFile(id: string, user: SessionUser) {
+    const letter = await this.prisma.sickLetter.findUnique({ where: { id } });
+    if (!letter) throw new NotFoundException('Surat tidak ditemukan.');
+    if (user.role === Role.KETUA_KELAS && user.kelasId !== letter.kelasId) {
+      throw new ForbiddenException('Akses ditolak.');
+    }
+    const expectedDirectory = path.resolve(this.uploadDir) + path.sep;
+    const filePath = path.resolve(letter.filePath);
+    if (!filePath.startsWith(expectedDirectory) || !fs.existsSync(filePath)) {
+      throw new NotFoundException('Berkas surat tidak ditemukan.');
+    }
+    return { filePath, fileName: letter.fileName, mimeType: letter.mimeType };
   }
 }

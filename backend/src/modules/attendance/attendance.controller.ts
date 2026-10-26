@@ -7,9 +7,11 @@ import {
   Delete,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AttendanceService } from './attendance.service';
+import { AttendanceService, type AttendanceAuditContext } from './attendance.service';
 import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -18,6 +20,13 @@ import { Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
+
+type RequestWithId = Request & { requestId?: string };
+const auditContext = (request: RequestWithId): AttendanceAuditContext => ({
+  requestId: request.requestId,
+  ipAddress: request.ip,
+  userAgent: request.get('user-agent'),
+});
 
 @ApiTags('Attendance')
 @ApiCookieAuth('session')
@@ -41,8 +50,9 @@ export class AttendanceController {
   saveBatch(
     @Body() dto: BatchAttendanceDto,
     @CurrentUser() user: SessionUser,
+    @Req() request: RequestWithId,
   ) {
-    return this.attendanceService.saveBatch(dto, user);
+    return this.attendanceService.saveBatch(dto, user, auditContext(request));
   }
 
   @Patch(':id')
@@ -52,8 +62,9 @@ export class AttendanceController {
     @Param('id') id: string,
     @Body() dto: UpdateAttendanceDto,
     @CurrentUser() user: SessionUser,
+    @Req() request: RequestWithId,
   ) {
-    return this.attendanceService.updateAttendance(id, dto, user);
+    return this.attendanceService.updateAttendance(id, dto, user, auditContext(request));
   }
 
   @Post('permissions')
@@ -62,8 +73,9 @@ export class AttendanceController {
   grantPresentPermission(
     @Body() dto: CreateAttendancePermissionDto,
     @CurrentUser() user: SessionUser,
+    @Req() request: RequestWithId,
   ) {
-    return this.attendanceService.grantPresentPermission(dto, user);
+    return this.attendanceService.grantPresentPermission(dto, user, auditContext(request));
   }
 
   @Get('history')
@@ -91,7 +103,8 @@ export class AttendanceController {
   deleteAttendance(
     @Param('id') id: string,
     @CurrentUser() user: SessionUser,
+    @Req() request: RequestWithId,
   ) {
-    return this.attendanceService.deleteAttendance(id, user);
+    return this.attendanceService.deleteAttendance(id, user, auditContext(request));
   }
 }

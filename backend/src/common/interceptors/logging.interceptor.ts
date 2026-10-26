@@ -11,18 +11,18 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
     const requestId = (request as any).requestId ?? '-';
-    const { method, url } = request;
+    const { method, path } = request;
     const start = Date.now();
 
     return next.handle().pipe(
       tap({
         next: () => {
           const ms = Date.now() - start;
-          this.logger.log(`${method} ${url} ${response.statusCode} ${ms}ms [${requestId}]`);
+          this.logger.log(`${method} ${path} ${response.statusCode} ${ms}ms [${requestId}]`);
         },
         error: (err) => {
           const ms = Date.now() - start;
-          this.logger.warn(`${method} ${url} ERR ${ms}ms [${requestId}] ${err?.message ?? err}`);
+          this.logger.warn(`${method} ${path} ERR ${ms}ms [${requestId}] status=${err?.status ?? 500}`);
         },
       }),
     );

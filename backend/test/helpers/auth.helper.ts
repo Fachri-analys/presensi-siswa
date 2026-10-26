@@ -8,6 +8,7 @@ export async function loginAndGetCookie(
 ): Promise<string[]> {
   const response = await request(app.getHttpServer())
     .post('/api/v1/auth/login')
+    .set('Origin', 'http://localhost:3000')
     .send({ email, password })
     .expect(200);
 

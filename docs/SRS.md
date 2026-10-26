@@ -74,7 +74,7 @@ Matriks otorisasi:
 - **FR-REPORT-02:** Sistem harus menyediakan riwayat berdasarkan kelas serta rentang tanggal yang valid dan berada dalam cakupan role.
 - **FR-REPORT-03:** Sistem harus menyediakan rekap laporan per kelas/periode dengan filter status bila digunakan.
 - **FR-REPORT-04:** Perhitungan “Hadir” mencakup Terlambat; nilai Terlambat adalah rincian, tidak dihitung dua kali pada total.
-- **FR-REPORT-05:** Aturan hari efektif, libur, zona waktu, batas keterlambatan, dan perlakuan hari tanpa presensi harus dikonfigurasi/disepakati sekolah, bukan diasumsikan oleh client.
+- **FR-REPORT-05:** Hari efektif harus dihitung konsisten di backend dari `SCHOOL_WORKING_DAYS` dan `SCHOOL_HOLIDAYS`; sekolah harus mengisi kalender sebelum memakai laporan. Client tidak menentukan denominator.
 - **FR-AUDIT-01:** Backend harus mencatat aktor, aksi, tipe/ID objek, waktu server, hasil, dan request ID untuk operasi penting.
 - **FR-AUDIT-02:** Log tidak boleh memuat password, token, cookie, sandi reset, atau rahasia.
 - **FR-AUDIT-03:** Guru Piket dan Admin dapat membaca log sesuai cakupan kebijakan; Ketua Kelas tidak dapat membaca log global.

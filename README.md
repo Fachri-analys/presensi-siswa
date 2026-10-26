@@ -113,9 +113,11 @@ docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.domain-sekolah.sch
 docker run -d --name presensi-web --restart unless-stopped -p 3000:3000 presensi-frontend:latest
 ```
 
-Gunakan HTTPS untuk API publik dan simpan konfigurasi backend di secret manager atau environment yang aman. `backend/.env` harus berisi `DATABASE_URL` production yang benar. Volume `presensi_uploads` menyimpan lampiran saat container dibuat ulang. Gunakan satu replica backend selama berkas masih disimpan di volume lokal; skala horizontal memerlukan penyimpanan berkas dan rate limiter bersama.
+Gunakan HTTPS untuk API publik dan simpan konfigurasi backend di secret manager atau environment yang aman. `backend/.env` harus berisi `DATABASE_URL` production yang benar serta kalender sekolah melalui `SCHOOL_WORKING_DAYS` dan `SCHOOL_HOLIDAYS`. Volume `presensi_uploads` menyimpan lampiran saat container dibuat ulang. Gunakan satu replica backend selama berkas masih disimpan di volume lokal; skala horizontal memerlukan penyimpanan berkas dan rate limiter bersama.
 
-Lakukan backup PostgreSQL secara terjadwal. Uji pemulihan hanya ke database staging kosong; jangan gunakan database operasional sebagai target uji.
+Cadangkan PostgreSQL dan volume `presensi_uploads` secara terjadwal. Uji pemulihan hanya ke database dan volume staging kosong; jangan gunakan data operasional sebagai target uji. [Panduan backend](./backend/README.md#backup--restore-database-dan-berkas) memuat contoh backup volume.
+
+GitHub Actions saat ini memvalidasi kode dan membangun image Docker; deployment tetap dilakukan manual karena target hosting dan rahasia deployment belum dikonfigurasi di repository.
 
 ## Dokumentasi
 

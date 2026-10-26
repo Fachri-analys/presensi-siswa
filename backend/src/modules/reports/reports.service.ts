@@ -221,33 +221,35 @@ export class ReportsService {
     const effectiveDays = countEffectiveDays(from, to);
 
     const classes = await this.prisma.class.findMany({
-      where: query.status ? { status: query.status as ActiveStatus } : {},
+      where: { status: query.status ? query.status as ActiveStatus : ActiveStatus.active },
       orderBy: { nama: 'asc' },
       select: {
         id: true,
         nama: true,
         jurusan: true,
         status: true,
-        _count: { select: { students: true } },
+        _count: { select: { students: { where: { status: ActiveStatus.active } } } },
       },
     });
 
     // Ambil semua attendance di rentang, group by kelas
-    const attendances = await this.prisma.attendance.findMany({
+    const attendances = await this.prisma.attendance.groupBy({
+      by: ['kelasId', 'status'],
       where: { date: { gte: from, lte: to } },
-      select: { kelasId: true, status: true },
+      _count: { _all: true },
     });
 
     const byKelas = new Map<string, Counter>();
     for (const a of attendances) {
       const c = byKelas.get(a.kelasId) ?? emptyCounter();
-      if (a.status === 'HADIR') c.hadir++;
+      const count = a._count._all;
+      if (a.status === 'HADIR') c.hadir += count;
       else if (a.status === 'TERLAMBAT') {
-        c.hadir++;
-        c.terlambat++;
-      } else if (a.status === 'IZIN') c.izin++;
-      else if (a.status === 'SAKIT') c.sakit++;
-      else if (a.status === 'ALPA') c.alpa++;
+        c.hadir += count;
+        c.terlambat += count;
+      } else if (a.status === 'IZIN') c.izin += count;
+      else if (a.status === 'SAKIT') c.sakit += count;
+      else if (a.status === 'ALPA') c.alpa += count;
       byKelas.set(a.kelasId, c);
     }
 

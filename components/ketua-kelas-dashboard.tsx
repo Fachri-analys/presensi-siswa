@@ -258,7 +258,7 @@ export function KetuaKelasDashboard() {
         <PresensiForm
           options={students}
           target={target}
-          presentAllowedFor={() => true}
+          presentAllowedFor={() => ready && activeSession !== null}
           onSubmit={save}
           onCancel={close}
         />

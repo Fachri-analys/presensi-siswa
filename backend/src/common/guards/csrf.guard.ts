@@ -16,7 +16,7 @@ export class CsrfGuard implements CanActivate {
     const fetchSite = request.get('sec-fetch-site');
     const allowedOrigins = this.config.get<string[]>('app.corsOrigins', []);
 
-    if ((origin && !allowedOrigins.includes(origin)) || fetchSite === 'cross-site') {
+    if (!origin || !allowedOrigins.includes(origin) || fetchSite === 'cross-site') {
       throw new ForbiddenException({ code: 'FORBIDDEN', message: 'Asal permintaan tidak diizinkan.' });
     }
 

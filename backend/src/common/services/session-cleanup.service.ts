@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
  * to prevent table bloat under high concurrent usage.
  */
 @Injectable()
-export class SessionCleanupService {
+export class SessionCleanupService implements OnModuleDestroy {
   private readonly logger = new Logger(SessionCleanupService.name);
   private intervalRef: NodeJS.Timeout | null = null;
 
@@ -30,6 +30,10 @@ export class SessionCleanupService {
       clearInterval(this.intervalRef);
       this.intervalRef = null;
     }
+  }
+
+  onModuleDestroy(): void {
+    this.stopPeriodicCleanup();
   }
 
   async cleanExpiredSessions(): Promise<number> {

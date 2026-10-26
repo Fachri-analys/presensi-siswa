@@ -1,31 +1,24 @@
-# Backend Handoff & Production Readiness
+# Backend Handoff
 
-Dokumentasi serah terima implementasi backend dan integrasi sistem presensi siswa SMK Negeri 11 Jakarta.
+Status dokumen ini diperbarui 26 Oktober 2026. Aplikasi memiliki alur backend utama dan CI, tetapi status lulus CI saja belum membuktikan kesiapan produksi. Deployment, kredensial production, target ketersediaan, serta uji pemulihan tetap harus diverifikasi pada lingkungan sekolah.
 
-- **Status:** Selesai Diimplementasikan & Teruji (Production Ready)
-- **Arsitektur:** Monorepo (Next.js 16 + NestJS 10 + PostgreSQL 16 + Prisma 5)
-- **Tanggal Selesai:** 16 Oktober 2026
+## Stack dan alur utama
 
-## Apa yang telah diimplementasikan
+- Frontend: Next.js 16. Backend: NestJS 11, Prisma 5, dan PostgreSQL 16.
+- Autentikasi memakai sesi cookie; permintaan yang mengubah data diperiksa terhadap Origin frontend yang diizinkan.
+- Ketua Kelas dibatasi ke kelasnya, tanggal hari ini, dan jadwal presensi. Semua pemeriksaan tetap dilakukan di backend.
+- Simpan batch presensi dan unggah surat sakit memperbarui data terkait dalam transaksi database. Berkas surat dapat diunduh lewat endpoint berotorisasi.
+- Daftar siswa dibatasi maksimal 100 baris per halaman. Riwayat dan rekap presensi dibatasi maksimal 366 hari.
+- Hari efektif diatur dengan `SCHOOL_WORKING_DAYS` dan `SCHOOL_HOLIDAYS`. Nilai default adalah Senin–Jumat tanpa hari libur tambahan.
+- Audit log mencatat operasi tulis pada akun, siswa, guru, kelas, dan surat; isi password maupun token tidak dicatat.
 
-- **Backend NestJS 10:** Lengkap dengan modul `auth`, `students`, `teachers`, `classes`, `attendance`, `monitoring`, `sick-letters`, `users`, `audit-logs`, dan `health`.
-- **Database PostgreSQL & Prisma ORM:** Skema relasional dengan indeks performa, soft-delete via status `inactive`, transaksi atomik (`$transaction`), dan eager-loading anti N+1 query.
-- **Autentikasi & Keamanan:** Cookie session `HttpOnly` + `SameSite=lax`, token acak ter-hash SHA-256, password ter-hash bcrypt (12 rounds), proteksi IDOR per kelas untuk Ketua Kelas, rate-limiting, CORS, dan Helmet security headers.
-- **Unggah Surat Izin/Sakit:** Multipart upload dengan whitelist MIME type (`application/pdf`, `image/jpeg`, `image/png`), batas 5 MB, dan sanitasi nama file hash UUID acak anti path-traversal.
-- **Frontend Integration Layer:** Repositori API (`api-auth`, `api-school`, `api-attendance`, `api-admin`, `api-monitoring`, `api-activity`) pada `lib/data/` dengan decoder type-safe dan fallback offline terproteksi.
-- **Ekspor Dokumen:** Ekspor lembar kerja Excel (.xlsx via ExcelJS) berlogo resmi dan cetak PDF via styling responsif `@media print`.
-- **Automated Testing:** 76 test otomatis lulus 100% (40 Vitest frontend + 36 Jest backend).
-- **Docker Multi-Stage:** `Dockerfile` dan `backend/Dockerfile` siap produksi dengan non-root user (UID 1001).
+## Pemeriksaan sebelum produksi
 
-## Checklist Kesiapan Operasional
+- [ ] Tetapkan domain frontend/API, HTTPS, `CORS_ORIGINS`, `SESSION_SAME_SITE`, serta secret production.
+- [ ] Isi kalender sekolah melalui `SCHOOL_WORKING_DAYS` dan `SCHOOL_HOLIDAYS`; pastikan hari libur sekolah tahun berjalan masuk.
+- [ ] Jalankan migrasi pada database yang benar dan verifikasi backup database serta volume unggahan dapat dipulihkan ke staging.
+- [ ] Uji alur login dan seluruh peran pada domain deployment, termasuk blokir Origin yang tidak dikenal.
+- [ ] Tetapkan target beban, retensi surat, pemantauan, dan prosedur insiden.
+- [ ] Jalankan workflow CI pada commit kandidat rilis. Workflow saat ini memvalidasi dan membangun image; workflow ini tidak melakukan deployment otomatis.
 
-- [x] Kontrak final memiliki definisi JSON request/response untuk setiap operasi yang digunakan UI.
-- [x] Status HTTP, kode error, request ID, pagination, field errors, dan response 204 disepakati dan diuji.
-- [x] Autentikasi cookie/session, logout, CSRF, CORS, timeout, dan sesi kedaluwarsa diuji.
-- [x] Zona waktu sekolah (`Asia/Jakarta` / UTC midnight @db.Date) dan kalkulasi hari efektif diputuskan.
-- [x] Hak akses diuji server-side dengan akun semua role (Admin, Guru Piket, Ketua Kelas) dan pencegahan IDOR terverifikasi.
-- [x] Reset password mandiri oleh Admin dan nonaktif siswa/guru mempertahankan integritas riwayat presensi.
-- [x] Lingkungan pengujian tersedia; kredensial uji diisolasi di `.env.test.local` tanpa ada rahasia di Git.
-- [x] Dokumentasi API Swagger interaktif dapat diakses pada `http://localhost:4000/api/docs`.
-- [x] Prosedur backup database terkompresi dan pemulihan telah diverifikasi.
-- [x] CI/CD pipeline dual-job (Frontend + Backend) aktif dan teruji di GitHub Actions.
+Lihat [README utama](../README.md) dan [README backend](../backend/README.md) untuk langkah menjalankan aplikasi, backup, dan pemulihan.

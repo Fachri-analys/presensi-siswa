@@ -17,7 +17,6 @@ import { btn, field } from "./ui";
 import { getLocalDateKey } from "@/lib/time";
 import { useRole } from "./app-shell";
 import { getApiBaseUrl } from "@/lib/data/api-client";
-import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { createApiSchoolRepository } from "@/lib/data/api-school";
 import type { SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 
@@ -88,6 +87,7 @@ export function SuratSakitModal({
     keterangan: string;
     fileName: string;
     fileSize: string;
+    fileUrl: string;
   } | null>(null);
 
   function resetForm() {
@@ -197,6 +197,7 @@ export function SuratSakitModal({
 
       const baseUrl = getApiBaseUrl();
       if (!baseUrl) throw new Error("Backend belum dikonfigurasi.");
+      let uploadedId = "";
       {
         const formData = new FormData();
         formData.append("file", selectedFile!);
@@ -218,20 +219,8 @@ export function SuratSakitModal({
           throw new Error(errText);
         }
 
-        const attendanceRepo = createApiAttendanceRepository();
-        if (!attendanceRepo) throw new Error("Backend belum dikonfigurasi.");
-        await attendanceRepo.saveClassAttendance({
-            date: tanggal,
-            kelasId: studentClassId,
-            records: [
-              {
-                nis,
-                status: "SAKIT",
-                waktu: null,
-                keterangan: `Surat Sakit: ${keterangan.trim()} (Berkas: ${selectedFile!.name})`,
-              },
-            ],
-        });
+        const savedLetter = await res.json();
+        uploadedId = savedLetter.id;
       }
 
       setSubmittedInfo({
@@ -242,6 +231,7 @@ export function SuratSakitModal({
         keterangan: keterangan.trim(),
         fileName: selectedFile!.name,
         fileSize: formatFileSize(selectedFile!.size),
+        fileUrl: new URL(`sick-letters/${uploadedId}/file`, baseUrl).toString(),
       });
 
       setStatus("success");
@@ -279,6 +269,9 @@ export function SuratSakitModal({
               <span className="text-muted text-xs">Kelas</span>
               <span className="font-medium text-ink">{submittedInfo.kelasNama}</span>
             </div>
+            <a href={submittedInfo.fileUrl} className="text-primary underline" target="_blank" rel="noreferrer">
+              Buka berkas surat
+            </a>
             <div className="flex justify-between items-center gap-2">
               <span className="text-muted text-xs">Tanggal Sakit</span>
               <span className="font-medium text-ink">{submittedInfo.tanggal}</span>

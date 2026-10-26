@@ -10,16 +10,26 @@ import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
 import { ActiveStatus, AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
-import { parseDateOnly, nowWibTime } from '../../common/utils/time.util';
+import { parseDateOnly, nowWibTime, todayWib } from '../../common/utils/time.util';
 import { assertClassAccess } from '../../common/utils/access-control.util';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { CreateAttendancePermissionDto } from './dto/create-attendance-permission.dto';
+import { countEffectiveDays } from '../../common/utils/effective-days';
+
+export interface AttendanceAuditContext {
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
 
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async saveBatch(dto: BatchAttendanceDto, user: SessionUser) {
+  async saveBatch(dto: BatchAttendanceDto, user: SessionUser, auditContext: AttendanceAuditContext = {}) {
+    if (dto.replace && user.role === Role.KETUA_KELAS) {
+      throw new ForbiddenException('Ketua Kelas tidak diizinkan mengganti seluruh presensi kelas.');
+    }
     // 1. Proteksi IDOR / BOLA: Ketua Kelas HANYA boleh mengisi kelasnya sendiri
     if (user.role === Role.KETUA_KELAS) {
       if (!user.kelasId || user.kelasId !== dto.kelasId) {
@@ -30,6 +40,9 @@ export class AttendanceService {
     }
 
     const attendanceDate = parseDateOnly(dto.date);
+    if (user.role === Role.KETUA_KELAS && dto.date !== todayWib()) {
+      throw new ForbiddenException('Ketua Kelas hanya dapat mengisi presensi untuk tanggal hari ini.');
+    }
     const kelas = await this.prisma.class.findUnique({ where: { id: dto.kelasId }, select: { status: true } });
     if (!kelas || kelas.status !== ActiveStatus.active) {
       throw new NotFoundException('Kelas aktif tidak ditemukan.');
@@ -128,6 +141,20 @@ export class AttendanceService {
         savedList.push(saved);
       }
 
+      if (dto.replace) {
+        const submittedStudentIds = nisValues.map((nis) => studentMap.get(nis)!);
+        await tx.attendance.deleteMany({
+          where: {
+            date: attendanceDate,
+            kelasId: dto.kelasId,
+            studentId: {
+              in: students.map((student) => student.id),
+              notIn: submittedStudentIds,
+            },
+          },
+        });
+      }
+
       // Catat audit log aktivitas
       await tx.auditLog.create({
         data: {
@@ -136,6 +163,7 @@ export class AttendanceService {
           objectType: 'ATTENDANCE',
           objectId: dto.kelasId,
           result: 'SUCCESS',
+          ...auditContext,
           metadata: {
             date: dto.date,
             kelasId: dto.kelasId,
@@ -203,6 +231,7 @@ export class AttendanceService {
 
     const fromDate = parseDateOnly(query.from);
     const toDate = parseDateOnly(query.to);
+    this.assertDateRange(fromDate, toDate);
 
     // Agregasi grup by tanggal dan status (Hanya 1 query, O(1) query complexity)
     const rawCounts = await this.prisma.attendance.groupBy({
@@ -286,9 +315,12 @@ export class AttendanceService {
     });
 
     // 2. Agregasi status presensi per siswa menggunakan groupBy (Query 2 - Mencegah N+1)
-    const dateFilter: { gte?: Date; lte?: Date } = {};
-    if (query.from) dateFilter.gte = parseDateOnly(query.from);
-    if (query.to) dateFilter.lte = parseDateOnly(query.to);
+    const toDate = parseDateOnly(query.to ?? todayWib());
+    const fromDate = parseDateOnly(
+      query.from ?? new Date(toDate.getTime() - 365 * 86_400_000).toISOString().slice(0, 10),
+    );
+    this.assertDateRange(fromDate, toDate);
+    const dateFilter = { gte: fromDate, lte: toDate };
 
     const counts = await this.prisma.attendance.groupBy({
       by: ['studentId', 'status'],
@@ -299,16 +331,8 @@ export class AttendanceService {
       _count: { status: true },
     });
 
-    // Hitung tanggal unik presensi sebagai effectiveDays
-    const distinctDates = await this.prisma.attendance.findMany({
-      where: {
-        kelasId: query.kelasId,
-        ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
-      },
-      distinct: ['date'],
-      select: { date: true },
-    });
-    const effectiveDays = distinctDates.length;
+    // Gunakan satu definisi hari efektif untuk rekap, laporan, dan statistik.
+    const effectiveDays = countEffectiveDays(fromDate, toDate);
 
     const studentStats = new Map<
       string,
@@ -358,8 +382,8 @@ export class AttendanceService {
       };
     });
 
-    const from = query.from ?? (distinctDates.length > 0 ? distinctDates[0].date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-    const to = query.to ?? (distinctDates.length > 0 ? distinctDates[distinctDates.length - 1].date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const from = fromDate.toISOString().slice(0, 10);
+    const to = toDate.toISOString().slice(0, 10);
 
     return {
       kelas: {
@@ -376,7 +400,14 @@ export class AttendanceService {
     };
   }
 
-  async grantPresentPermission(dto: CreateAttendancePermissionDto, user: SessionUser) {
+  private assertDateRange(from: Date, to: Date): void {
+    const days = Math.floor((to.getTime() - from.getTime()) / 86_400_000) + 1;
+    if (days < 1 || days > 366) {
+      throw new BadRequestException('Rentang tanggal harus berurutan dan maksimal 366 hari.');
+    }
+  }
+
+  async grantPresentPermission(dto: CreateAttendancePermissionDto, user: SessionUser, auditContext: AttendanceAuditContext = {}) {
     const date = parseDateOnly(dto.date);
     const kelas = await this.prisma.class.findUnique({
       where: { id: dto.kelasId },
@@ -408,14 +439,15 @@ export class AttendanceService {
           objectType: 'ATTENDANCE_PERMISSION',
           objectId: permission.id,
           result: 'SUCCESS',
-          metadata: { date: dto.date, kelasId: dto.kelasId, nis: dto.nis },
+          ...auditContext,
+          metadata: { date: dto.date, kelasId: dto.kelasId },
         },
       });
       return permission;
     });
   }
 
-  async updateAttendance(id: string, dto: UpdateAttendanceDto, user: SessionUser) {
+  async updateAttendance(id: string, dto: UpdateAttendanceDto, user: SessionUser, auditContext: AttendanceAuditContext = {}) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id },
       include: { student: { select: { nis: true, nama: true } } },
@@ -423,11 +455,11 @@ export class AttendanceService {
     if (!attendance) throw new NotFoundException('Catatan presensi tidak ditemukan.');
     assertClassAccess(user, attendance.kelasId);
 
-    const needsPermission =
-      user.role === Role.KETUA_KELAS &&
-      attendance.status !== AttendanceStatus.HADIR &&
-      attendance.status !== AttendanceStatus.TERLAMBAT &&
-      (dto.status === AttendanceStatus.HADIR || dto.status === AttendanceStatus.TERLAMBAT);
+    const isPresent = dto.status === AttendanceStatus.HADIR || dto.status === AttendanceStatus.TERLAMBAT;
+    if (user.role === Role.KETUA_KELAS && attendance.date.toISOString().slice(0, 10) !== todayWib()) {
+      throw new ForbiddenException('Ketua Kelas hanya dapat mengubah presensi untuk tanggal hari ini.');
+    }
+    const needsPermission = user.role === Role.KETUA_KELAS && isPresent;
     let presentWindowOpen = true;
     if (needsPermission) {
       const currentTime = nowWibTime();
@@ -473,10 +505,10 @@ export class AttendanceService {
           objectType: 'ATTENDANCE',
           objectId: id,
           result: 'SUCCESS',
+          ...auditContext,
           metadata: {
             date: attendance.date.toISOString().slice(0, 10),
             kelasId: attendance.kelasId,
-            nis: attendance.student.nis,
             fromStatus: attendance.status,
             toStatus: updated.status,
           },
@@ -499,7 +531,7 @@ export class AttendanceService {
     });
   }
 
-  async deleteAttendance(id: string, user: SessionUser) {
+  async deleteAttendance(id: string, user: SessionUser, auditContext: AttendanceAuditContext = {}) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id },
       include: { student: { select: { nis: true, nama: true } } },
@@ -520,11 +552,10 @@ export class AttendanceService {
           objectType: 'ATTENDANCE',
           objectId: id,
           result: 'SUCCESS',
+          ...auditContext,
           metadata: {
             date: attendance.date.toISOString().slice(0, 10),
             kelasId: attendance.kelasId,
-            nis: attendance.student.nis,
-            nama: attendance.student.nama,
             status: attendance.status,
           },
         },

@@ -26,6 +26,7 @@ export interface AttendanceBatch {
   date: string;
   kelasId: string;
   records: Array<Pick<AttendanceRecord, "nis" | "status" | "waktu" | "keterangan">>;
+  replace?: boolean;
 }
 
 export interface PresentPermissionInput { date: string; kelasId: string; nis: string }

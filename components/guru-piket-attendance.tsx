@@ -130,14 +130,7 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         }));
 
       try {
-        await Promise.all(savedRecords.filter((saved) => !attendance[saved.nis]?.status).map((saved) => attendanceRepo.deleteAttendance(saved.id)));
-        if (records.length > 0) {
-          await attendanceRepo.saveClassAttendance({
-            date,
-            kelasId: classId,
-            records,
-          });
-        }
+        await attendanceRepo.saveClassAttendance({ date, kelasId: classId, records, replace: true });
       } catch (err: unknown) {
         setMessage(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
         return;

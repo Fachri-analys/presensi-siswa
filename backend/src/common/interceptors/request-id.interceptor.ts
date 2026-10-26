@@ -12,7 +12,7 @@ export class RequestIdInterceptor implements NestInterceptor {
 
     const incoming = request.headers['x-request-id'];
     const requestId =
-      typeof incoming === 'string' && incoming.length > 0 && incoming.length <= 100
+      typeof incoming === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(incoming)
         ? incoming
         : randomUUID();
 
