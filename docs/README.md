@@ -7,7 +7,7 @@ Dokumentasi spesifikasi produk, sistem, arsitektur, dan integrasi API untuk Sist
 | [PROJECT-MAP.md](./PROJECT-MAP.md) | Peta direktori, lapisan aplikasi, alur utama, dan titik integrasi. |
 | [PRD.md](./PRD.md) | Tujuan produk, persona pengguna, ruang lingkup, alur utama, dan aturan bisnis presensi. |
 | [SRS.md](./SRS.md) | Persyaratan sistem fungsional, nonfungsional, keamanan, dan kriteria penerimaan. |
-| [API-CONTRACT.md](./API-CONTRACT.md) | Spesifikasi lengkap resource, endpoint, payload request/response, kode error, dan autentikasi API. |
+| [API-CONTRACT.md](./API-CONTRACT.md) | Draf rancangan resource dan kontrak; route aktif diverifikasi lewat controller, DTO, test, dan Swagger. |
 | [BACKEND-HANDOFF.md](./BACKEND-HANDOFF.md) | Panduan arsitektur backend, keputusan desain database, eager loading, dan checklist integrasi. |
 | [PRODUCTION-SETUP.md](./PRODUCTION-SETUP.md) | Setup server production, deploy, bootstrap admin, backup, pemulihan staging, dan rollback. |
 

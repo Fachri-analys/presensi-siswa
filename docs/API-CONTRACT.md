@@ -1,10 +1,10 @@
 # Kontrak API Resmi (API Specification)
 
-- **Status:** Final & Terintegrasi
+- **Status:** Draf kontrak; cocokkan dengan Swagger dan controller sebelum mengubah client
 - **Produk:** Sistem Presensi Siswa — SMK Negeri 11 Jakarta
 - **Versi:** `v1`
 
-Dokumen ini merupakan spesifikasi API backend resmi yang diimplementasikan pada NestJS (`/api/v1`) dan digunakan oleh Next.js frontend adapter (`lib/data/*`). Dokumentasi OpenAPI/Swagger interaktif tersedia di `/api/docs`.
+Dokumen ini menyimpan rancangan kontrak untuk API NestJS (`/api/v1`) dan adapter Next.js (`lib/data/*`). Sebagian tabel masih berupa usulan dan belum seluruhnya cocok dengan route aktif. Untuk perilaku saat ini, gunakan controller, DTO, test, dan Swagger non-production di `/api/docs` sebagai sumber kebenaran.
 
 ## 1. Prinsip kontrak
 
@@ -12,7 +12,7 @@ Dokumen ini merupakan spesifikasi API backend resmi yang diimplementasikan pada 
 - Gunakan HTTPS selain localhost.
 - ID entity adalah string stabil yang diterbitkan server.
 - Segmen path dinamis untuk ID wajib dikodekan dengan `encodeURIComponent` sebelum digabungkan ke URL.
-- Usulan waktu: tanggal presensi sebagai `YYYY-MM-DD`; timestamp audit sebagai ISO 8601 dengan zona/offset eksplisit. Zona waktu sekolah perlu disahkan.
+- Tanggal presensi diterima sebagai `YYYY-MM-DD` dan diproses sebagai tanggal kalender sekolah `Asia/Jakarta`; timestamp audit memakai waktu server ISO 8601.
 - Usulan request/response JSON UTF-8.
 - Fondasi frontend saat ini menerima objek JSON langsung dan decoder per endpoint. Bila tim memilih envelope seperti `{ "data": ... }`, adapter/decoder harus secara eksplisit membuka envelope; jangan membuat asumsi diam-diam.
 - `204 No Content` hanya untuk operasi tanpa nilai kembalian. Operasi lain mengembalikan JSON sesuai skema.
@@ -22,11 +22,11 @@ Dokumen ini merupakan spesifikasi API backend resmi yang diimplementasikan pada 
 
 ### Sesi cookie
 
-Backend menggunakan cookie sesi `HttpOnly`, `Secure` di produksi, CORS allowlist dengan credentials, dan pemeriksaan `Origin` untuk request yang mengubah data. Frontend mengirim `credentials: "include"`. Domain deployment, SameSite, durasi sesi, rotasi, dan perilaku logout tetap perlu disesuaikan dengan lingkungan sekolah.
+Backend menggunakan cookie sesi `HttpOnly`, `Secure` di produksi, CORS allowlist dengan credentials, dan CSRF guard yang memeriksa `Origin` untuk request yang mengubah data. Frontend mengirim `credentials: "include"`. Domain, SameSite, dan kalender sekolah tetap harus cocok dengan konfigurasi production.
 
 Jangan menyimpan token akses rahasia ke `localStorage`. Password hanya dikirim melalui koneksi TLS pada login dan tidak pernah dikembalikan.
 
-### Format error usulan
+### Format error
 
 Status HTTP adalah sumber kategori utama. Body boleh mengikuti format berikut, tetapi frontend tidak menampilkan `message` mentah:
 
@@ -41,7 +41,7 @@ Status HTTP adalah sumber kategori utama. Body boleh mengikuti format berikut, t
 }
 ```
 
-| HTTP | `code` usulan | Arti |
+| HTTP | `code` umum | Arti |
 |---:|---|---|
 | 400 | `BAD_REQUEST` | Bentuk request tidak valid |
 | 401 | `UNAUTHENTICATED` | Belum login/sesi berakhir |
@@ -54,9 +54,9 @@ Status HTTP adalah sumber kategori utama. Body boleh mengikuti format berikut, t
 
 Jangan kirim stack trace, SQL, path internal, hash/password, cookie/token, atau detail secret dalam respons. Tetapkan `X-Request-Id` atau padanan yang konsisten. Fondasi client saat ini membaca `x-request-id` untuk pesan server umum.
 
-## 3. Endpoint usulan
+## 3. Rancangan endpoint
 
-Semua nama route dan metode masih perlu disetujui. Route di bawah memakai prefix `/api/v1`.
+Tabel berikut adalah catatan desain, bukan daftar route aktif yang lengkap. Verifikasi path dan payload terhadap Swagger/controller sebelum menggunakannya.
 
 ### Sesi
 
@@ -193,10 +193,10 @@ Tanggal dan kelas berada pada path agar server memvalidasinya sebagai scope batc
 
 | Method | Path | Format | Kegunaan |
 |---|---|---|---|
-| `POST` | `/sick-letters/upload` | `multipart/form-data` | Unggah surat dokter/izin (`file`, `date`, `kelasId`, `studentId`, `keterangan`). Validasi MIME (PDF/JPG/PNG), batas 5 MB, sanitasi UUID, proteksi IDOR. |
-| `GET` | `/sick-letters/class/{kelasId}` | `application/json` | Daftar riwayat surat izin/sakit untuk kelas terkait. |
+| `POST` | `/sick-letters/upload` | `multipart/form-data` | Unggah surat dengan header UUID v4 `Idempotency-Key`; retry payload yang sama mengembalikan surat yang sama. Field: `file`, `date`, `kelasId`, `studentId`, `keterangan`. |
+| `GET` | `/sick-letters/class/{kelasId}?page=1&limit=20` | `application/json` | Riwayat surat bertahap, maksimal 100 baris per halaman; respons berisi `items`, `total`, `page`, `limit`, `totalPages`, dan `nextCursor`. |
 
-## 4. Bentuk data utama usulan
+## 4. Bentuk data utama
 
 - **SessionUser:** `id`, `nama`, `email`, `role`, `kelasId` (nullable).
 - **SchoolClass:** `id`, `nama`, `jurusan`, `ketuaAkunId` (nullable), `active`.

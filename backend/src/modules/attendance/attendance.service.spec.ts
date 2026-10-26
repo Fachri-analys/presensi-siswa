@@ -226,6 +226,45 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     expect(mockPrisma.class.findUnique).not.toHaveBeenCalled();
   });
 
+  it('[SEC-ATT-03] menolak Ketua Kelas mengisi presensi pada hari nonsekolah', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS, kelasId: 'cls-own',
+    };
+    mockTodayWib.mockReturnValue('2026-10-17'); // Sabtu
+
+    await expect(service.saveBatch(
+      { date: '2026-10-17', kelasId: 'cls-own', records: [] },
+      ketuaUser,
+    )).rejects.toThrow(ForbiddenException);
+
+    expect(mockPrisma.class.findUnique).not.toHaveBeenCalled();
+    mockTodayWib.mockReturnValue('2026-10-16');
+  });
+
+  it('[SEC-ATT-04] Ketua Kelas tidak dapat menghapus Hadir di luar sesi terbuka', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS, kelasId: 'cls-own',
+    };
+    mockNowWibTime.mockReturnValue('17:00');
+    mockPrisma.attendance.findUnique.mockResolvedValueOnce({
+      id: 'att-1',
+      date: new Date('2026-10-16T00:00:00.000Z'),
+      kelasId: 'cls-own',
+      status: AttendanceStatus.HADIR,
+      student: { nis: '241101', nama: 'Ahmad' },
+    });
+    mockPrisma.schedule.findMany.mockResolvedValueOnce([
+      { session: AttendanceSession.PAGI, mulai: '07:00', selesai: '12:00', terkunci: false },
+    ]);
+
+    await expect(service.deleteAttendance('att-1', ketuaUser)).rejects.toThrow(ForbiddenException);
+
+    expect(mockPrisma.attendance.delete).not.toHaveBeenCalled();
+    mockNowWibTime.mockReturnValue('08:00');
+  });
+
   it('[SEC-ATT-02] Ketua Kelas tidak dapat mengganti seluruh presensi kelas', async () => {
     const ketuaUser = {
       id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas',

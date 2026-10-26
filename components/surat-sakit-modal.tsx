@@ -68,6 +68,7 @@ export function SuratSakitModal({
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const fileInputId = useId();
 
   // Form states
@@ -91,6 +92,7 @@ export function SuratSakitModal({
   } | null>(null);
 
   function resetForm() {
+    idempotencyKeyRef.current = null;
     setNis(initialNis ?? "");
     setTanggal(getLocalDateKey());
     setKeterangan("");
@@ -129,12 +131,14 @@ export function SuratSakitModal({
 
     const fileError = validateFile(file);
     if (fileError) {
+      idempotencyKeyRef.current = null;
       setErrors((prev) => ({ ...prev, file: fileError }));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
+    idempotencyKeyRef.current = null;
     setErrors((prev) => {
       const next = { ...prev };
       delete next.file;
@@ -144,6 +148,7 @@ export function SuratSakitModal({
   }
 
   function handleRemoveFile() {
+    idempotencyKeyRef.current = null;
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setErrors((prev) => {
@@ -198,6 +203,8 @@ export function SuratSakitModal({
       const baseUrl = getApiBaseUrl();
       if (!baseUrl) throw new Error("Backend belum dikonfigurasi.");
       let uploadedId = "";
+      const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+      idempotencyKeyRef.current = idempotencyKey;
       {
         const formData = new FormData();
         formData.append("file", selectedFile!);
@@ -211,6 +218,7 @@ export function SuratSakitModal({
           method: "POST",
           body: formData,
           credentials: "include",
+          headers: { "Idempotency-Key": idempotencyKey },
         });
 
         if (!res.ok) {
@@ -328,6 +336,7 @@ export function SuratSakitModal({
             <select
               value={nis}
               onChange={(e) => {
+                idempotencyKeyRef.current = null;
                 setNis(e.target.value);
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -359,6 +368,7 @@ export function SuratSakitModal({
               type="date"
               value={tanggal}
               onChange={(e) => {
+                idempotencyKeyRef.current = null;
                 setTanggal(e.target.value);
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -383,6 +393,7 @@ export function SuratSakitModal({
               maxLength={200}
               placeholder="Contoh: Demam tinggi 2 hari, istirahat atas petunjuk dokter Puskesmas."
               onChange={(e) => {
+                idempotencyKeyRef.current = null;
                 setKeterangan(e.target.value);
                 setErrors((prev) => {
                   const next = { ...prev };

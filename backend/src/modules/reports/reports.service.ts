@@ -119,25 +119,28 @@ export class ReportsService {
         orderBy: { nis: 'asc' },
         select: { id: true, nis: true, nama: true, status: true },
       }),
-      this.prisma.attendance.findMany({
+      this.prisma.attendance.groupBy({
+        by: ['studentId', 'status'],
         where: {
           kelasId: query.kelasId,
           date: { gte: from, lte: to },
         },
-        select: { studentId: true, status: true },
+        orderBy: [{ studentId: 'asc' }, { status: 'asc' }],
+        _count: { status: true },
       }),
     ]);
 
     const byStudent = new Map<string, Counter>();
     for (const a of attendances) {
       const c = byStudent.get(a.studentId) ?? emptyCounter();
-      if (a.status === 'HADIR') c.hadir++;
+      const count = typeof a._count === 'object' ? a._count.status ?? 0 : 0;
+      if (a.status === 'HADIR') c.hadir += count;
       else if (a.status === 'TERLAMBAT') {
-        c.hadir++;
-        c.terlambat++;
-      } else if (a.status === 'IZIN') c.izin++;
-      else if (a.status === 'SAKIT') c.sakit++;
-      else if (a.status === 'ALPA') c.alpa++;
+        c.hadir += count;
+        c.terlambat += count;
+      } else if (a.status === 'IZIN') c.izin += count;
+      else if (a.status === 'SAKIT') c.sakit += count;
+      else if (a.status === 'ALPA') c.alpa += count;
       byStudent.set(a.studentId, c);
     }
 

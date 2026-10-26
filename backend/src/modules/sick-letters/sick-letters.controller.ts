@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
+  Query,
   Header,
   StreamableFile,
   UploadedFile,
@@ -14,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { createReadStream } from 'node:fs';
 import { SickLettersService, type UploadFile } from './sick-letters.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
+import { QuerySickLettersDto } from './dto/query-sick-letters.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
@@ -38,8 +41,9 @@ export class SickLettersController {
     @Body() dto: CreateSickLetterDto,
     @UploadedFile() file: UploadFile,
     @CurrentUser() user: SessionUser,
+    @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    return this.sickLettersService.uploadFile(dto, file, user);
+    return this.sickLettersService.uploadFile(dto, file, user, idempotencyKey);
   }
 
   @Get(':id/file')
@@ -59,8 +63,9 @@ export class SickLettersController {
   @ApiOperation({ summary: 'Daftar surat izin/sakit berdasarkan kelas' })
   findByClass(
     @Param('kelasId') kelasId: string,
+    @Query() query: QuerySickLettersDto,
     @CurrentUser() user: SessionUser,
   ) {
-    return this.sickLettersService.findByClass(kelasId, user);
+    return this.sickLettersService.findByClass(kelasId, query, user);
   }
 }

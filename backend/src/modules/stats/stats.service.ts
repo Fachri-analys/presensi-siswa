@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { SessionUser } from '../../common/types/session-user.type';
 import { parseDateKey } from '../../common/utils/date-key';
 import { countEffectiveDays } from '../../common/utils/effective-days';
+import { todayWib } from '../../common/utils/time.util';
 import {
   QueryAttendanceStatsDto,
   QueryClassComparisonDto,
@@ -24,15 +25,22 @@ export class StatsService {
   }
 
   private defaultRange(from?: string, to?: string) {
-    const now = new Date();
+    const today = parseDateKey(todayWib());
     const start = from
       ? parseDateKey(from)
-      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const end = to ? parseDateKey(to) : new Date();
+      : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const end = to ? parseDateKey(to) : today;
     if (start > end) {
       throw new BadRequestException({
         code: 'VALIDATION_ERROR',
         message: 'Tanggal "from" harus <= "to".',
+      });
+    }
+    const totalDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+    if (totalDays > 366) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Rentang maksimal 366 hari.',
       });
     }
     return { from: start, to: end };

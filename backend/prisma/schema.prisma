@@ -191,6 +191,8 @@ model Schedule {
 
 model SickLetter {
   id           String   @id @default(cuid())
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash   String?  @map("request_hash")
   date         DateTime @db.Date
   kelasId      String   @map("kelas_id")
   studentId    String   @map("student_id")

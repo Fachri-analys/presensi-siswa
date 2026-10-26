@@ -40,9 +40,7 @@ export class AttendanceService {
     }
 
     const attendanceDate = parseDateOnly(dto.date);
-    if (user.role === Role.KETUA_KELAS && dto.date !== todayWib()) {
-      throw new ForbiddenException('Ketua Kelas hanya dapat mengisi presensi untuk tanggal hari ini.');
-    }
+    if (user.role === Role.KETUA_KELAS) this.assertClassLeaderWriteDate(attendanceDate);
     const kelas = await this.prisma.class.findUnique({ where: { id: dto.kelasId }, select: { status: true } });
     if (!kelas || kelas.status !== ActiveStatus.active) {
       throw new NotFoundException('Kelas aktif tidak ditemukan.');
@@ -56,12 +54,7 @@ export class AttendanceService {
       );
 
       if (hasPresent) {
-        const schedules = await this.prisma.schedule.findMany();
-        // Cek apakah ada sesi yang window-nya terbuka dan tidak terkunci
-        const openSession = schedules.find(
-          (s) => !s.terkunci && markedAt >= s.mulai && markedAt < s.selesai,
-        );
-        presentWindowOpen = Boolean(openSession);
+        presentWindowOpen = await this.isPresentWindowOpen(markedAt);
       }
     }
 
@@ -308,13 +301,6 @@ export class AttendanceService {
       throw new NotFoundException('Kelas tidak ditemukan.');
     }
 
-    // 1. Ambil seluruh siswa kelas ini (Query 1)
-    const students = await this.prisma.student.findMany({
-      where: { kelasId: query.kelasId },
-      orderBy: { nis: 'asc' },
-    });
-
-    // 2. Agregasi status presensi per siswa menggunakan groupBy (Query 2 - Mencegah N+1)
     const toDate = parseDateOnly(query.to ?? todayWib());
     const fromDate = parseDateOnly(
       query.from ?? new Date(toDate.getTime() - 365 * 86_400_000).toISOString().slice(0, 10),
@@ -322,6 +308,19 @@ export class AttendanceService {
     this.assertDateRange(fromDate, toDate);
     const dateFilter = { gte: fromDate, lte: toDate };
 
+    // Include active students and inactive students with records in this historical range.
+    const students = await this.prisma.student.findMany({
+      where: {
+        kelasId: query.kelasId,
+        OR: [
+          { status: ActiveStatus.active },
+          { attendances: { some: { date: dateFilter } } },
+        ],
+      },
+      orderBy: { nis: 'asc' },
+    });
+
+    // Aggregate per student/status to avoid loading every attendance row.
     const counts = await this.prisma.attendance.groupBy({
       by: ['studentId', 'status'],
       where: {
@@ -456,17 +455,11 @@ export class AttendanceService {
     assertClassAccess(user, attendance.kelasId);
 
     const isPresent = dto.status === AttendanceStatus.HADIR || dto.status === AttendanceStatus.TERLAMBAT;
-    if (user.role === Role.KETUA_KELAS && attendance.date.toISOString().slice(0, 10) !== todayWib()) {
-      throw new ForbiddenException('Ketua Kelas hanya dapat mengubah presensi untuk tanggal hari ini.');
-    }
+    if (user.role === Role.KETUA_KELAS) this.assertClassLeaderWriteDate(attendance.date);
     const needsPermission = user.role === Role.KETUA_KELAS && isPresent;
     let presentWindowOpen = true;
     if (needsPermission) {
-      const currentTime = nowWibTime();
-      const schedules = await this.prisma.schedule.findMany();
-      presentWindowOpen = schedules.some(
-        (schedule) => !schedule.terkunci && currentTime >= schedule.mulai && currentTime < schedule.selesai,
-      );
+      presentWindowOpen = await this.isPresentWindowOpen();
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -542,6 +535,13 @@ export class AttendanceService {
     }
 
     assertClassAccess(user, attendance.kelasId);
+    if (user.role === Role.KETUA_KELAS) {
+      this.assertClassLeaderWriteDate(attendance.date);
+      const isPresent = attendance.status === AttendanceStatus.HADIR || attendance.status === AttendanceStatus.TERLAMBAT;
+      if (isPresent && !(await this.isPresentWindowOpen())) {
+        throw new ForbiddenException('Ketua Kelas hanya dapat menghapus presensi Hadir/Terlambat saat sesi terbuka.');
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.attendance.delete({ where: { id } });
@@ -561,5 +561,19 @@ export class AttendanceService {
         },
       });
     });
+  }
+
+  private assertClassLeaderWriteDate(date: Date): void {
+    const dateKey = date.toISOString().slice(0, 10);
+    if (dateKey !== todayWib() || countEffectiveDays(date, date) === 0) {
+      throw new ForbiddenException('Ketua Kelas hanya dapat mengubah presensi pada hari sekolah ini.');
+    }
+  }
+
+  private async isPresentWindowOpen(markedAt = nowWibTime()): Promise<boolean> {
+    const schedules = await this.prisma.schedule.findMany();
+    return schedules.some(
+      (schedule) => !schedule.terkunci && markedAt >= schedule.mulai && markedAt < schedule.selesai,
+    );
   }
 }

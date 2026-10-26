@@ -79,7 +79,7 @@ Model Prisma utama: `User` dan `Session`; `Teacher`, `Student`, dan `Class`; `At
 - DTO, route controller, aturan role, dan logika bisnis backend masing-masing ada di `backend/src/modules/<modul>/`.
 - Adapter dan controller presensi menyediakan batch create/update, update record, delete record, serta pemberian izin hadir per siswa.
 - Frontend menyediakan `getReport()` melalui `GET attendance/recap`; backend juga memiliki modul `reports` dengan endpoint laporan dan ekspor CSV. Tentukan jalur yang digunakan layar tertentu sebelum mengubah format atau perhitungan.
-- `CONTRIBUTING.md` menyebut `API-CONTRACT.md` sebagai draf, sedangkan `API-CONTRACT.md` menyebut dirinya final dan terintegrasi. PRD/SRS juga masih berlabel draf, sementara `BACKEND-HANDOFF.md` menyatakan backend selesai. Perlakukan status dokumen sebagai hal yang perlu dikonfirmasi; perilaku runtime perlu diperiksa pada kode dan test terkait.
+- `API-CONTRACT.md` adalah draf rancangan, bukan daftar lengkap route aktif. Cocokkan dengan controller, DTO, test, dan Swagger non-production. PRD/SRS tetap memuat kebijakan sekolah yang belum diputuskan; gunakan [PRODUCTION-SETUP.md](./PRODUCTION-SETUP.md) untuk langkah setup operasional.
 
 ## Menjalankan dan memvalidasi
 

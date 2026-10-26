@@ -81,5 +81,5 @@ Ganti `TIMESTAMP` dengan nama pasangan file dari satu backup yang sama. Setelah 
 
 - Tetapkan pemantauan uptime, kapasitas disk, kegagalan backup, retensi, dan prosedur pemulihan bersama sekolah.
 - Perbarui `SCHOOL_HOLIDAYS` dan `SCHOOL_WORKING_DAYS` sebelum periode laporan dimulai.
-- Image Docker yang dibangun diberi tag commit supaya bisa dipilih kembali. Untuk rollback aplikasi, deploy ulang dengan `RELEASE_TAG=<commit-sebelumnya>`; rollback database hanya aman bila migrasi tetap kompatibel dengan versi aplikasi tersebut.
+- Image Docker yang dibangun diberi tag commit supaya bisa dipilih kembali. Untuk rollback aplikasi ke image yang masih ada di server, jalankan `RELEASE_TAG=<commit-sebelumnya> BUILD_IMAGES=false ./scripts/deploy-production.sh`; rollback database hanya aman bila migrasi tetap kompatibel dengan versi aplikasi tersebut.
 - Workflow GitHub Actions memvalidasi perubahan, tetapi tidak melakukan deploy otomatis. Otomatiskan nanti hanya setelah server, akses SSH, dan aturan approval production ditetapkan.

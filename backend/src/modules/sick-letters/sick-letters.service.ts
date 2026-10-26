@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
+import { QuerySickLettersDto } from './dto/query-sick-letters.dto';
 import { AttendanceStatus, Role } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import * as fs from 'fs';
@@ -42,7 +44,11 @@ export class SickLettersService {
     dto: CreateSickLetterDto,
     file: UploadFile | undefined,
     user: SessionUser,
+    idempotencyKey: string,
   ) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey ?? '')) {
+      throw new BadRequestException('Header Idempotency-Key harus berupa UUID v4.');
+    }
     if (!file) {
       throw new BadRequestException('File surat izin/sakit wajib diunggah.');
     }
@@ -88,6 +94,18 @@ export class SickLettersService {
       throw new ForbiddenException('Ketua Kelas hanya dapat mengirim surat untuk tanggal hari ini.');
     }
 
+    const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const requestHash = crypto.createHash('sha256').update(JSON.stringify({
+      actorId: user.id,
+      studentId: student.id,
+      kelasId: dto.kelasId,
+      date: dto.date,
+      keterangan: dto.keterangan.trim(),
+      fileHash,
+    })).digest('hex');
+    const existingLetter = await this.findExistingUpload(idempotencyKey, requestHash);
+    if (existingLetter) return existingLetter;
+
     // 4. Sanitasi nama file & cegah path traversal menggunakan hash unik
     const safeExt = file.mimetype === 'image/jpeg' ? '.jpg' : file.mimetype === 'image/png' ? '.png' : '.pdf';
     const randomName = `${crypto.randomUUID()}${safeExt}`;
@@ -110,6 +128,8 @@ export class SickLettersService {
             fileSize: file.size,
             mimeType: file.mimetype,
             uploadedById: user.id,
+            idempotencyKey,
+            requestHash,
           },
           select: {
             id: true,
@@ -147,17 +167,25 @@ export class SickLettersService {
       });
     } catch (error) {
       fs.rmSync(destinationPath, { force: true });
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+        const existing = await this.findExistingUpload(idempotencyKey, requestHash);
+        if (existing) return existing;
+      }
       throw error;
     }
   }
 
-  async findByClass(kelasId: string, user: SessionUser) {
-    if (user.role === Role.KETUA_KELAS && user.kelasId !== kelasId) {
-      throw new ForbiddenException('Akses ditolak.');
+  private async findExistingUpload(idempotencyKey: string, requestHash: string) {
+    const existing = await this.prisma.sickLetter.findUnique({
+      where: { idempotencyKey },
+      select: { id: true, requestHash: true },
+    });
+    if (!existing) return null;
+    if (existing.requestHash !== requestHash) {
+      throw new ConflictException('Idempotency-Key sudah dipakai untuk data surat yang berbeda.');
     }
-
-    return this.prisma.sickLetter.findMany({
-      where: { kelasId },
+    return this.prisma.sickLetter.findUnique({
+      where: { id: existing.id },
       select: {
         id: true,
         date: true,
@@ -169,10 +197,49 @@ export class SickLettersService {
         mimeType: true,
         uploadedById: true,
         createdAt: true,
-        student: { select: { nis: true, nama: true } },
       },
-      orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async findByClass(kelasId: string, query: QuerySickLettersDto, user: SessionUser) {
+    if (user.role === Role.KETUA_KELAS && user.kelasId !== kelasId) {
+      throw new ForbiddenException('Akses ditolak.');
+    }
+
+    const page = Math.max(1, Number(query.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
+    const where = { kelasId };
+    const [items, total] = await Promise.all([
+      this.prisma.sickLetter.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          date: true,
+          kelasId: true,
+          studentId: true,
+          keterangan: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          uploadedById: true,
+          createdAt: true,
+          student: { select: { nis: true, nama: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+      this.prisma.sickLetter.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      nextCursor: page * limit < total ? String(page + 1) : null,
+    };
   }
 
   async getFile(id: string, user: SessionUser) {

@@ -120,7 +120,7 @@ Kriteria rilis MVP yang dapat diuji:
 
 ## 10. Ketergantungan dan risiko
 
-- Kontrak endpoint dan format respons perlu disepakati sebelum adapter frontend dibuat.
+- Adapter frontend dan API sudah terhubung; draf kontrak API perlu direkonsiliasi dengan controller/DTO sebelum perubahan endpoint berikutnya.
 - Kalender hari belajar, hari libur, zona waktu sekolah, keterlambatan, dan periode laporan memengaruhi hasil statistik.
 - Kebijakan retensi dan penghapusan dapat memengaruhi relasi presensi historis.
 - Strategi cookie, domain deployment, HTTPS, CSRF, dan CORS harus cocok dengan deployment frontend.
