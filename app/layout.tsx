@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import "@fontsource-variable/inter";
 import "./globals.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Sistem Presensi Siswa | SMK Negeri 11 Jakarta",
   icons: { icon: [{ url: "/favicon.ico" }, { url: "/icon.png", type: "image/png", sizes: "128x128" }] },

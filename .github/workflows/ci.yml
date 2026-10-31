@@ -19,6 +19,8 @@ jobs:
     name: Frontend (Next.js)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_API_BASE_URL: https://api.example.invalid/api/v1/
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -88,7 +90,7 @@ jobs:
         working-directory: backend
 
       - name: Check backend operational scripts
-        run: node --check scripts/load-test.mjs && node --check scripts/audit-upload-files.mjs
+        run: node --check scripts/load-test.mjs && node --check scripts/audit-upload-files.mjs && node --check scripts/verify-sqlite-restore.mjs
         working-directory: backend
 
       - name: Generate Prisma client
@@ -126,3 +128,62 @@ jobs:
       - name: Build backend container
         run: docker build -t presensi-backend:ci .
         working-directory: backend
+
+  production-runtime:
+    name: Production Compose runtime and SQLite restore smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: [frontend, backend]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Prepare isolated production environment
+        run: |
+          cp .env.production.example .env.production
+          sed -i 's/^DOMAIN=.*/DOMAIN=localhost/' .env.production
+          sed -i 's#^PUBLIC_API_BASE_URL=.*#PUBLIC_API_BASE_URL=https://localhost/api/v1/#' .env.production
+
+      - name: Start production Compose stack
+        run: docker compose --env-file .env.production -f docker-compose.production.yml --profile edge up -d --build
+
+      - name: Seed disposable production test account
+        run: |
+          ci_password="$(openssl rand -hex 24)"
+          docker compose --env-file .env.production -f docker-compose.production.yml --profile setup run --rm -e INITIAL_ADMIN_EMAIL=ci-admin@example.invalid -e INITIAL_ADMIN_PASSWORD="$ci_password" seed
+
+      - name: Wait for API and frontend health
+        run: |
+          for service in api web; do
+            container="$(docker compose --env-file .env.production -f docker-compose.production.yml ps -q "$service")"
+            for attempt in $(seq 1 60); do
+              status="$(docker inspect --format '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
+              [ "$status" = healthy ] && break
+              sleep 2
+            done
+            [ "$status" = healthy ] || { echo "$service did not become healthy"; exit 1; }
+          done
+
+      - name: Verify HTTPS edge and nonce CSP
+        run: |
+          curl --insecure --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 2 --dump-header /tmp/presensi-headers-1 https://localhost/login --output /tmp/presensi-login-1.html
+          curl --insecure --fail --silent --show-error --dump-header /tmp/presensi-headers-2 https://localhost/login --output /tmp/presensi-login-2.html
+          ! grep -qi "unsafe-inline" /tmp/presensi-headers-1
+          nonce1="$(sed -nE "s/.*script-src[^;]*'nonce-([^']+)'.*/\1/p" /tmp/presensi-headers-1 | head -n 1)"
+          nonce2="$(sed -nE "s/.*script-src[^;]*'nonce-([^']+)'.*/\1/p" /tmp/presensi-headers-2 | head -n 1)"
+          [ -n "$nonce1" ] && [ -n "$nonce2" ] && [ "$nonce1" != "$nonce2" ]
+          grep -q "nonce=\"$nonce1\"" /tmp/presensi-login-1.html
+          ! grep -Eiq '<[^>]+[[:space:]]style=' /tmp/presensi-login-1.html
+
+      - name: Verify SQLite backup, restore, and application read
+        run: |
+          docker compose --env-file .env.production -f docker-compose.production.yml exec -T api node --experimental-sqlite /app/scripts/backup-sqlite.mjs /app/data/ci-backup.sqlite
+          docker compose --env-file .env.production -f docker-compose.production.yml exec -T api node -e 'require("node:fs").copyFileSync("/app/data/ci-backup.sqlite", "/app/data/ci-restored.sqlite")'
+          docker compose --env-file .env.production -f docker-compose.production.yml exec -T api node --experimental-sqlite /app/scripts/verify-sqlite-restore.mjs /app/data/presensi.db /app/data/ci-restored.sqlite
+          docker compose --env-file .env.production -f docker-compose.production.yml run --rm --no-deps -e DATABASE_URL=file:/app/data/ci-restored.sqlite api node -e 'const { PrismaClient } = require("@prisma/client"); const prisma = new PrismaClient(); prisma.user.count().then((count) => { if (count !== 1) process.exitCode = 1; console.log(`Restored users: ${count}`); }).finally(() => prisma.$disconnect())'
+
+      - name: Stop disposable stack
+        if: always()
+        run: |
+          docker compose --env-file .env.production -f docker-compose.production.yml --profile edge down --volumes --remove-orphans || true
+          rm -f .env.production /tmp/presensi-headers-* /tmp/presensi-login-*.html

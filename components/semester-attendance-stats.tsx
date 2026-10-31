@@ -304,10 +304,13 @@ export function SemesterAttendanceStats({ initialClassId }: { initialClassId?: s
                                 aria-label={`Persentase kehadiran ${item.nama}`}
                                 className="h-1.5 w-16 overflow-hidden rounded-full bg-primary-soft"
                               >
-                                <div
-                                  className={`h-full ${item.persentase >= 85 ? "bg-success" : item.persentase >= 75 ? "bg-warning" : "bg-danger"}`}
-                                  style={{ width: `${item.persentase}%` }}
-                                />
+                                <svg className="h-full w-full" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                                  <rect
+                                    className={`fill-current ${item.persentase >= 85 ? "text-success" : item.persentase >= 75 ? "text-warning" : "text-danger"}`}
+                                    width={item.persentase}
+                                    height="8"
+                                  />
+                                </svg>
                               </div>
                               <span className="tabular-nums font-medium">{item.persentase}%</span>
                             </div>

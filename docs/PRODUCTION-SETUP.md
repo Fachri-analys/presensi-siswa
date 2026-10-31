@@ -60,7 +60,7 @@ Script membuat snapshot SQLite konsisten dengan `VACUUM INTO`, menjalankan `PRAG
 0 2 * * * cd /opt/presensi-siswa && ./scripts/backup-production.sh >> /var/log/presensi-backup.log 2>&1
 ```
 
-Salin hasil backup ke penyimpanan di luar server dengan enkripsi dan retensi yang ditetapkan sekolah. Backup yang hanya berada di server yang sama tidak melindungi dari kerusakan/hilangnya server.
+Salin hasil backup ke penyimpanan di luar server dengan enkripsi. Masa simpan yang ditetapkan pemilik project adalah enam bulan; lihat [Kebijakan Retensi Data](./DATA-RETENTION-POLICY.md). Skrip backup tidak menghapus backup lama. Tinjau file yang melewati masa simpan secara manual setelah memastikan backup baru terbaca dan pemulihan sudah diuji. Backup yang hanya berada di server yang sama tidak melindungi dari kerusakan/hilangnya server.
 
 Untuk memeriksa konsistensi file lampiran dengan metadata SQLite, jalankan `DATABASE_URL=file:/app/data/presensi.db UPLOAD_DIR=/app/uploads npm run uploads:audit` dari container API atau lingkungan yang mengakses volume yang sama. Perintah ini hanya melaporkan file yatim dan metadata tanpa file; perintah ini tidak menghapus data.
 
