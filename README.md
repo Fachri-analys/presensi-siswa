@@ -60,6 +60,8 @@ cp backend/.env.example backend/.env
 
 `backend/.env.example` memakai konfigurasi database lokal. Jika seed juga perlu membuat Admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env`. Password awal minimal 12 karakter dan maksimal 72 byte UTF-8. Seed menyiapkan jadwal pagi dan siang, tetapi tidak membuat akun, guru, kelas, atau siswa contoh.
 
+Untuk tes akses role Admin, Guru Piket, dan Ketua Kelas, isi variabel `LOCAL_TEST_*` di `backend/.env` dengan password acak yang kuat, lalu jalankan `npm --prefix backend run local:seed-test-users`. Seeder hanya menyentuh database development `backend/prisma/dev.db`; detailnya ada di [README backend](./backend/README.md). Jangan commit file `.env`.
+
 ### Database dan server
 
 Jalankan dari root repository:

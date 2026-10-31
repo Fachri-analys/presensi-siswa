@@ -90,7 +90,7 @@ jobs:
         working-directory: backend
 
       - name: Check backend operational scripts
-        run: node --check scripts/load-test.mjs && node --check scripts/audit-upload-files.mjs && node --check scripts/verify-sqlite-restore.mjs
+        run: node --check scripts/load-test.mjs && node --check scripts/audit-upload-files.mjs && node --check scripts/verify-sqlite-restore.mjs && node --check scripts/seed-local-test-users.mjs
         working-directory: backend
 
       - name: Generate Prisma client

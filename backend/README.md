@@ -54,6 +54,14 @@ npm run backend:prisma:seed
 
 Seed selalu menyiapkan jadwal awal sesi pagi dan siang. Akun Admin dibuat hanya jika kedua variabel `INITIAL_ADMIN_*` diisi dan akun tersebut belum ada. Seed tidak membuat data sekolah contoh atau mengganti password akun yang sudah ada. Password awal harus minimal 12 karakter dan maksimal 72 byte UTF-8.
 
+Untuk mencoba ketiga role di database development, isi `LOCAL_TEST_*_EMAIL` dan `LOCAL_TEST_*_PASSWORD` pada `backend/.env`, lalu jalankan dari folder `backend/`:
+
+```bash
+npm run local:seed-test-users
+```
+
+Password akun tes harus minimal 24 karakter, memakai sedikitnya 3 jenis karakter, dan maksimal 72 byte UTF-8. Seeder hanya berjalan dengan `NODE_ENV=development` dan `DATABASE_URL=file:./dev.db`; ia membuat satu kelas lokal untuk Ketua Kelas, tidak mereset akun yang sudah ada, dan tidak mencetak password.
+
 Jalankan API dari root dengan `npm run backend:dev`, atau dari folder `backend/` dengan:
 
 ```bash

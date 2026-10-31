@@ -26,6 +26,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed:e2e": "ts-node test/seed-e2e.ts",
+    "local:seed-test-users": "node scripts/seed-local-test-users.mjs",
     "uploads:audit": "node scripts/audit-upload-files.mjs",
     "db:reset": "prisma migrate reset --force",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
