@@ -1,8 +1,8 @@
 # Backend API Sistem Presensi Siswa
 
-API NestJS untuk autentikasi, akun, data siswa dan sekolah, presensi, jadwal, monitoring, laporan, surat izin/sakit, dan log aktivitas. Data disimpan di PostgreSQL melalui Prisma.
+API NestJS untuk autentikasi, akun, data siswa dan sekolah, presensi, jadwal, monitoring, laporan, surat izin/sakit, dan log aktivitas. Data disimpan di file SQLite melalui Prisma.
 
-**Stack:** NestJS 11, TypeScript 5, Prisma 5, PostgreSQL 16.
+**Stack:** NestJS 11, TypeScript 5, Prisma 6, SQLite.
 
 ## Modul API
 
@@ -31,7 +31,7 @@ Role dan cakupan data tetap diperiksa backend. Ketua Kelas dibatasi ke kelas yan
 ### Prasyarat
 
 - Node.js `>=22.12.0` dan npm `>=10`.
-- Docker Compose, jika PostgreSQL dijalankan dari container.
+- Tidak perlu server database untuk development lokal.
 
 Jalankan perintah berikut dari root repository:
 
@@ -40,10 +40,11 @@ npm ci
 npm --prefix backend ci
 cp backend/.env.example backend/.env
 cp .env.example .env.local
-npm run docker:db
 npm run backend:prisma:generate
 npm --prefix backend run prisma:migrate
 ```
+
+Migrasi membuat `backend/prisma/dev.db`. File lokal tersebut diabaikan Git.
 
 Untuk membuat Admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env`, lalu jalankan:
 
@@ -67,7 +68,7 @@ Lihat [`backend/.env.example`](./.env.example). Variabel yang paling sering dise
 
 | Variabel | Fungsi |
 |---|---|
-| `DATABASE_URL` | Koneksi ke PostgreSQL. Nilai contoh mengarah ke database lokal `presensi_dev`. |
+| `DATABASE_URL` | Lokasi file SQLite; contoh lokal `file:./dev.db`, relatif terhadap `prisma/schema.prisma`. |
 | `PORT` | Port API, default `4000`. |
 | `CORS_ORIGINS` | Daftar origin frontend yang diizinkan; pisahkan dengan koma. |
 | `SESSION_COOKIE_NAME`, `SESSION_MAX_AGE_MS`, `SESSION_SAME_SITE` | Nama, masa berlaku, dan kebijakan SameSite cookie sesi. |
@@ -76,7 +77,7 @@ Lihat [`backend/.env.example`](./.env.example). Variabel yang paling sering dise
 | `SCHOOL_WORKING_DAYS`, `SCHOOL_HOLIDAYS` | Hari kerja ISO dan tanggal libur untuk perhitungan hari sekolah. |
 | `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | Kredensial opsional untuk membuat Admin pertama melalui seed. |
 
-Pada Docker Compose production, migrasi dan seed memakai akun bootstrap PostgreSQL. API menggunakan `POSTGRES_APP_USER` terpisah dengan hak database runtime yang lebih terbatas. Ikuti [Setup Production](../docs/PRODUCTION-SETUP.md) untuk konfigurasi server.
+Pada Docker Compose production, migrasi dan API memakai file `/app/data/presensi.db` pada named volume SQLite persisten. Volume database terpisah dari image dan volume unggahan. Ikuti [Setup Production](../docs/PRODUCTION-SETUP.md) untuk konfigurasi server, backup, dan restore.
 
 ## Test dan build
 
@@ -89,11 +90,11 @@ npm run typecheck
 npm run build
 ```
 
-Test end-to-end membutuhkan database test tersendiri bernama `presensi_test`. Fixture menolak database dengan nama lain dan membuat akun serta data khusus E2E. Gunakan kredensial test sementara, bukan kredensial sekolah. Contoh PowerShell dari folder `backend/`:
+Test end-to-end menggunakan file terpisah `backend/prisma/presensi_test.db`. Fixture menolak file dengan nama lain dan membuat akun serta data khusus E2E. Contoh PowerShell dari folder `backend/`:
 
 ```powershell
 $env:NODE_ENV = "test"
-$env:DATABASE_URL = "postgresql://presensi:local-password@localhost:5432/presensi_test?schema=public"
+$env:DATABASE_URL = "file:./presensi_test.db"
 $env:TEST_ADMIN_PASSWORD = "temporary-admin-password"
 $env:TEST_GURU_PASSWORD = "temporary-guru-password"
 $env:TEST_KETUA_PASSWORD = "temporary-ketua-password"
@@ -101,7 +102,7 @@ npm run prisma:seed:e2e
 npm run test:e2e
 ```
 
-Pastikan database `presensi_test` sudah dibuat dan kredensial pada `DATABASE_URL` hanya memiliki akses ke database test tersebut. Semua password fixture harus minimal 12 karakter.
+Jalankan `npx prisma migrate deploy` terlebih dulu dengan `NODE_ENV=test` dan `DATABASE_URL` tersebut. File E2E berbeda dari database development. Semua password fixture harus minimal 12 karakter.
 
 ## Struktur kode
 

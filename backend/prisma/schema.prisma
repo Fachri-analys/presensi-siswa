@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -129,7 +129,7 @@ model Class {
 
 model Attendance {
   id         String           @id @default(cuid())
-  date       DateTime         @db.Date
+  date       DateTime
   kelasId    String           @map("kelas_id")
   studentId  String           @map("student_id")
   status     AttendanceStatus
@@ -154,7 +154,7 @@ model Attendance {
 
 model AttendancePermission {
   id          String    @id @default(cuid())
-  date        DateTime  @db.Date
+  date        DateTime
   kelasId     String    @map("kelas_id")
   studentId   String    @map("student_id")
   grantedById String    @map("granted_by_id")
@@ -193,7 +193,7 @@ model SickLetter {
   id           String   @id @default(cuid())
   idempotencyKey String? @unique @map("idempotency_key")
   requestHash   String?  @map("request_hash")
-  date         DateTime @db.Date
+  date         DateTime
   kelasId      String   @map("kelas_id")
   studentId    String   @map("student_id")
   keterangan   String

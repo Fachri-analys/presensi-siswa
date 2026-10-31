@@ -4,7 +4,7 @@ Status dokumen ini diperbarui 26 Oktober 2026. Aplikasi memiliki alur backend ut
 
 ## Stack dan alur utama
 
-- Frontend: Next.js 16. Backend: NestJS 11, Prisma 5, dan PostgreSQL 16.
+- Frontend: Next.js 16. Backend: NestJS 11, Prisma 6, dan SQLite.
 - Autentikasi memakai sesi cookie; permintaan yang mengubah data diperiksa terhadap Origin frontend yang diizinkan.
 - Ketua Kelas dibatasi ke kelasnya, tanggal hari ini, dan jadwal presensi. Semua pemeriksaan tetap dilakukan di backend.
 - Simpan batch presensi dan unggah surat sakit memperbarui data terkait dalam transaksi database. Berkas surat dapat diunduh lewat endpoint berotorisasi.

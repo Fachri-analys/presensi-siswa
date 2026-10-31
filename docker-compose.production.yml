@@ -1,42 +1,4 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.production}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.production}
-      TZ: Asia/Jakarta
-      PGTZ: Asia/Jakarta
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks: [presensi]
-
-  db-init:
-    image: postgres:16-alpine
-    restart: "no"
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.production}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.production}
-      POSTGRES_APP_USER: ${POSTGRES_APP_USER:?Set POSTGRES_APP_USER in .env.production}
-      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env.production}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
-    volumes:
-      - ./scripts/ensure-runtime-db-user.sh:/scripts/ensure-runtime-db-user.sh:ro
-    entrypoint: ["sh", "/scripts/ensure-runtime-db-user.sh"]
-    depends_on:
-      db:
-        condition: service_healthy
-    networks: [presensi]
-
   migrate:
     image: presensi-migrate:${RELEASE_TAG:-local}
     build:
@@ -45,13 +7,11 @@ services:
     restart: "no"
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: file:/app/data/presensi.db
+    user: "1001:1001"
+    volumes:
+      - sqlite_data:/app/data
     command: ["npm", "run", "prisma:migrate:deploy"]
-    depends_on:
-      db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     networks: [presensi]
 
   api:
@@ -61,17 +21,14 @@ services:
     restart: unless-stopped
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: file:/app/data/presensi.db
       CORS_ORIGINS: https://${DOMAIN}
     volumes:
+      - sqlite_data:/app/data
       - uploads_data:/app/uploads
     ports:
       - "127.0.0.1:${API_HOST_PORT:-4000}:4000"
     depends_on:
-      db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
     networks: [presensi]
@@ -128,18 +85,19 @@ services:
     profiles: [setup]
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL: file:/app/data/presensi.db
     command: ["npm", "run", "prisma:seed"]
+    user: "1001:1001"
+    volumes:
+      - sqlite_data:/app/data
     depends_on:
-      db:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     networks: [presensi]
 
 volumes:
-  postgres_data:
-    name: ${VOLUME_PREFIX:-presensi}_postgres_data
+  sqlite_data:
+    name: ${VOLUME_PREFIX:-presensi}_sqlite_data
   uploads_data:
     name: ${VOLUME_PREFIX:-presensi}_uploads_data
   caddy_data:

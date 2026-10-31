@@ -4,7 +4,7 @@ Peta tingkat tinggi repository Sistem Presensi Siswa SMK Negeri 11 Jakarta. Isin
 
 ## Gambaran arsitektur
 
-Repository ini adalah monorepo TypeScript dengan frontend Next.js di root, backend NestJS di `backend/`, dan PostgreSQL yang dimodelkan dengan Prisma.
+Repository ini adalah monorepo TypeScript dengan frontend Next.js di root, backend NestJS di `backend/`, dan SQLite yang dimodelkan dengan Prisma.
 
 ```mermaid
 flowchart LR
@@ -14,7 +14,7 @@ flowchart LR
     nest --> common[Guard, filter, interceptor<br/>backend/src/common/]
     nest --> modules[Modul domain<br/>backend/src/modules/]
     modules --> prisma[PrismaService]
-    prisma --> postgres[(PostgreSQL)]
+    prisma --> sqlite[(SQLite file persisten)]
 ```
 
 ## Peta direktori
@@ -32,7 +32,7 @@ flowchart LR
 | `backend/prisma/` | `schema.prisma`, migrasi, dan seed database. |
 | `backend/test/` | Test end-to-end dan helper autentikasi backend; unit test berada di dekat modul dengan akhiran `.spec.ts`. |
 | `docs/` | PRD, SRS, kontrak API, handoff backend, indeks dokumen, dan peta ini. |
-| `backend/docker-compose.yml` | PostgreSQL lokal; pgAdmin tersedia sebagai profile `tools`. |
+| `docker-compose.production.yml` | SQLite pada named volume persisten bersama API dan migrator. |
 | `Dockerfile`, `backend/Dockerfile` | Image produksi frontend dan backend. |
 | `.github/workflows/ci.yml` | Pipeline CI yang dirujuk README dan indeks dokumentasi. |
 
@@ -64,7 +64,7 @@ flowchart LR
 | `audit-logs` | Pembacaan log perubahan. |
 | `health` | Health check API dan koneksi database. |
 
-Model Prisma utama: `User` dan `Session`; `Teacher`, `Student`, dan `Class`; `Attendance` dan `AttendancePermission`; `Schedule`; `SickLetter`; serta `AuditLog`. Presensi memiliki batas unik tanggal-kelas-siswa. Role adalah `KETUA_KELAS`, `GURU_PIKET`, dan `ADMIN`; data sekolah dapat berstatus `active` atau `inactive`. Tanggal presensi disimpan sebagai tanggal database tanpa waktu, dan aturan jadwal memakai zona sekolah `Asia/Jakarta`.
+Model Prisma utama: `User` dan `Session`; `Teacher`, `Student`, dan `Class`; `Attendance` dan `AttendancePermission`; `Schedule`; `SickLetter`; serta `AuditLog`. Presensi memiliki batas unik tanggal-kelas-siswa dan relasi foreign key. Role adalah `KETUA_KELAS`, `GURU_PIKET`, dan `ADMIN`; data sekolah dapat berstatus `active` atau `inactive`. Tanggal presensi disimpan sebagai DateTime pada tengah malam UTC untuk mempertahankan semantik tanggal, dan aturan jadwal memakai zona sekolah `Asia/Jakarta`.
 
 ## Alur data yang perlu diketahui
 
@@ -88,7 +88,6 @@ Jalankan dari root repository. Siapkan `.env.local` dari `.env.example` dan `bac
 ```bash
 npm install
 npm --prefix backend install
-npm run docker:db
 npm run backend:prisma:generate
 npm --prefix backend run prisma:migrate
 npm run backend:prisma:seed

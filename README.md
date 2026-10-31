@@ -1,13 +1,13 @@
 # Sistem Presensi Siswa
 
-Web app untuk mencatat presensi siswa dan membantu sekolah melihat rekap kehadiran. Repository ini berisi frontend Next.js, API NestJS, serta skema dan migrasi PostgreSQL melalui Prisma.
+Web app untuk mencatat presensi siswa dan membantu sekolah melihat rekap kehadiran. Repository ini berisi frontend Next.js, API NestJS, serta skema dan migrasi SQLite melalui Prisma.
 
 [![CI](https://github.com/Fachri-analys/presensi-siswa/actions/workflows/ci.yml/badge.svg)](https://github.com/Fachri-analys/presensi-siswa/actions)
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/UI-React%2019-blue?logo=react)](https://react.dev/)
 [![NestJS](https://img.shields.io/badge/Backend-NestJS%2011-red?logo=nestjs)](https://nestjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](https://www.postgresql.org/)
-[![Prisma](https://img.shields.io/badge/ORM-Prisma%205-2D3748?logo=prisma)](https://www.prisma.io/)
+[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://www.sqlite.org/)
+[![Prisma](https://img.shields.io/badge/ORM-Prisma%206-2D3748?logo=prisma)](https://www.prisma.io/)
 
 ## Fitur dan akses pengguna
 
@@ -28,24 +28,24 @@ Sistem mencatat status Hadir, Terlambat, Izin, Sakit, dan Alpa. Jadwal awal meny
 ├── lib/data/                # API client, kontrak, decoder, dan adapter frontend
 ├── tests/                   # Unit test frontend
 ├── backend/
-│   ├── prisma/              # Skema, migrasi, dan seed PostgreSQL
+│   ├── prisma/              # Skema, migrasi SQLite, dan seed
 │   ├── src/modules/         # Modul API NestJS
 │   └── test/                # Fixture dan test end-to-end
 ├── docs/                    # Peta proyek, setup, kontrak API, dan audit
-├── scripts/                 # Deploy, backup, dan inisialisasi role database
+├── scripts/                 # Deploy dan backup database/unggahan
 ├── .github/workflows/ci.yml # CI frontend dan backend
 ├── Dockerfile               # Image frontend
 └── docker-compose.production.yml
 ```
 
-Alur aplikasi: browser memanggil API melalui `lib/data/`; API memeriksa sesi dan peran pengguna, lalu membaca atau mengubah data PostgreSQL melalui Prisma. Akun dan peran berasal dari backend. Detail modul dan alur ada di [peta proyek](./docs/PROJECT-MAP.md).
+Alur aplikasi: browser memanggil API melalui `lib/data/`; API memeriksa sesi dan peran pengguna, lalu membaca atau mengubah data SQLite melalui Prisma. Akun dan peran berasal dari backend. Detail modul dan alur ada di [peta proyek](./docs/PROJECT-MAP.md).
 
 ## Menjalankan secara lokal
 
 ### Prasyarat
 
 - Node.js `>=22.12.0` dan npm `>=10`.
-- Docker dengan Docker Compose untuk PostgreSQL lokal.
+- Database SQLite lokal; tidak memerlukan server database atau Docker.
 
 ### Instalasi
 
@@ -65,13 +65,12 @@ cp backend/.env.example backend/.env
 Jalankan dari root repository:
 
 ```bash
-npm run docker:db
 npm run backend:prisma:generate
 npm --prefix backend run prisma:migrate
 npm run backend:prisma:seed
 ```
 
-Setelah PostgreSQL siap, buka dua terminal dari root repository:
+Migrasi membuat file SQLite baru pada `backend/prisma/dev.db`. Buka dua terminal dari root repository:
 
 ```bash
 npm run backend:dev
@@ -97,13 +96,13 @@ npm --prefix backend run typecheck
 npm --prefix backend test
 ```
 
-Test end-to-end backend menggunakan PostgreSQL test bernama `presensi_test` dan fixture khusus test. Jangan arahkan fixture tersebut ke database lokal berisi data operasional. Langkah setup ada di [backend README](./backend/README.md).
+Test end-to-end backend memakai file SQLite terpisah `backend/prisma/presensi_test.db` dan fixture khusus test; file ini tidak sama dengan database development.
 
-GitHub Actions menjalankan install bersih, audit dependency, lint, typecheck, unit test, migrasi PostgreSQL, test end-to-end, build aplikasi, validasi Compose, dan build image. Workflow berjalan pada push ke `main`, `production-ready`, dan `feature/**`, pull request ke `main`, serta dapat dijalankan manual. CI tidak melakukan deploy ke server.
+GitHub Actions menjalankan install bersih, audit dependency, lint, typecheck, unit test, migrasi SQLite, test end-to-end, build aplikasi, validasi Compose, dan build image. Workflow berjalan pada push ke `main`, `production-ready`, dan `feature/**`, pull request ke `main`, serta dapat dijalankan manual. CI tidak melakukan deploy ke server.
 
 ## Deployment
 
-Template production memakai Docker Compose pada satu server: PostgreSQL privat, API dengan akun database runtime terbatas, frontend, dan Caddy untuk HTTPS. Siapkan domain, DNS, firewall, serta secret server sebelum deploy. Petunjuk konfigurasi dan perintahnya ada di [Setup Production](./docs/PRODUCTION-SETUP.md).
+Template production memakai Docker Compose pada satu server: file SQLite pada named volume persisten, API, frontend, dan Caddy untuk HTTPS. SQLite sesuai untuk satu instance API; siapkan domain, DNS, dan firewall sebelum deploy. Petunjuk konfigurasi dan perintahnya ada di [Setup Production](./docs/PRODUCTION-SETUP.md).
 
 ```bash
 cp .env.production.example .env.production

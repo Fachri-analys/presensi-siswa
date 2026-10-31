@@ -61,28 +61,9 @@ jobs:
     name: Backend (NestJS + Prisma)
     runs-on: ubuntu-24.04
     timeout-minutes: 35
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: presensi
-          POSTGRES_PASSWORD: presensi_dev_password
-          POSTGRES_DB: presensi_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U presensi -d presensi_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://presensi:presensi_dev_password@localhost:5432/presensi_test?schema=public
-      POSTGRES_USER: presensi
-      POSTGRES_PASSWORD: presensi_dev_password
-      POSTGRES_DB: presensi_test
-      POSTGRES_APP_USER: presensi_runtime
-      POSTGRES_APP_PASSWORD: ${{ github.run_id }}-presensi-runtime-password-0123456789
+      DATABASE_URL: file:./presensi_test.db
       PORT: 4000
       TEST_ADMIN_PASSWORD: test-admin-${{ github.run_id }}-Password
       TEST_GURU_PASSWORD: test-guru-${{ github.run_id }}-Password
@@ -117,20 +98,6 @@ jobs:
       - name: Seed isolated E2E fixtures
         run: npm run prisma:seed:e2e
         working-directory: backend
-
-      - name: Create restricted runtime database role
-        run: |
-          docker cp scripts/ensure-runtime-db-user.sh "${{ job.services.postgres.id }}:/tmp/ensure-runtime-db-user.sh"
-          docker exec \
-            -e POSTGRES_HOST=localhost \
-            -e POSTGRES_USER="$POSTGRES_USER" \
-            -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-            -e POSTGRES_DB="$POSTGRES_DB" \
-            -e POSTGRES_APP_USER="$POSTGRES_APP_USER" \
-            -e POSTGRES_APP_PASSWORD="$POSTGRES_APP_PASSWORD" \
-            -e PGPASSWORD="$POSTGRES_PASSWORD" \
-            "${{ job.services.postgres.id }}" sh /tmp/ensure-runtime-db-user.sh
-          echo "DATABASE_URL=postgresql://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@localhost:5432/${POSTGRES_DB}?schema=public" >> "$GITHUB_ENV"
 
       - name: Lint backend
         run: npm run lint

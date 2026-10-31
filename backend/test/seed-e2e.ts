@@ -6,8 +6,8 @@ const adminPassword = process.env.TEST_ADMIN_PASSWORD;
 const guruPassword = process.env.TEST_GURU_PASSWORD;
 const ketuaPassword = process.env.TEST_KETUA_PASSWORD;
 
-if (process.env.NODE_ENV !== 'test' || !databaseUrl || new URL(databaseUrl).pathname !== '/presensi_test') {
-  throw new Error('Fixture E2E hanya boleh dijalankan pada database presensi_test dengan NODE_ENV=test.');
+if (process.env.NODE_ENV !== 'test' || !databaseUrl || !/^\/presensi_test(?:-[a-f0-9]+)?\.db$/.test(new URL(databaseUrl).pathname)) {
+  throw new Error('Fixture E2E hanya boleh dijalankan pada file presensi_test*.db dengan NODE_ENV=test.');
 }
 if (!adminPassword || adminPassword.length < 12 || !guruPassword || guruPassword.length < 12 || !ketuaPassword || ketuaPassword.length < 12) {
   throw new Error('TEST_ADMIN_PASSWORD, TEST_GURU_PASSWORD, dan TEST_KETUA_PASSWORD wajib diisi minimal 12 karakter.');

@@ -20,10 +20,7 @@ const productionDatabaseUrl = Joi.string()
   .custom((value, helpers) => {
     try {
       const url = new URL(value);
-      if (
-        !['postgres:', 'postgresql:'].includes(url.protocol) ||
-        ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-      ) {
+      if (url.protocol !== 'file:' || !url.pathname.startsWith('/app/data/')) {
         return helpers.error('any.invalid');
       }
       return value;
@@ -49,18 +46,8 @@ export const validationSchema = Joi.object({
     is: 'production',
     then: productionDatabaseUrl,
     otherwise: Joi.string().required().messages({
-      'any.required': 'DATABASE_URL wajib diisi (contoh: postgresql://user:pass@localhost:5432/db)',
+      'any.required': 'DATABASE_URL wajib diisi (contoh: file:./prisma/dev.db)',
     }),
-  }),
-  POSTGRES_APP_USER: Joi.when('NODE_ENV', {
-    is: 'production',
-    then: Joi.string().pattern(/^[a-z_][a-z0-9_]*$/i).required(),
-    otherwise: Joi.string().optional(),
-  }),
-  POSTGRES_APP_PASSWORD: Joi.when('NODE_ENV', {
-    is: 'production',
-    then: Joi.string().min(32).pattern(/^[A-Za-z0-9_.~-]+$/).required(),
-    otherwise: Joi.string().optional(),
   }),
 
   // Session

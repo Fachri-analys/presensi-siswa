@@ -65,8 +65,8 @@ export class AuditLogsService {
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
-        { action: { contains: search, mode: 'insensitive' } },
-        { objectType: { contains: search, mode: 'insensitive' } },
+        { action: { contains: search } },
+        { objectType: { contains: search } },
       ];
     }
 

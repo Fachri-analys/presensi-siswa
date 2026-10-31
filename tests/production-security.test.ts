@@ -11,19 +11,14 @@ function serviceBlock(name: string): string {
   return match[1];
 }
 
-describe("production database security", () => {
-  it("connects the API with a dedicated runtime account, not the bootstrap superuser", () => {
+describe("production database persistence", () => {
+  it("mounts SQLite storage into the API and migration service", () => {
     const api = serviceBlock("api");
-    expect(api).toMatch(/DATABASE_URL:\s*postgresql:\/\/\$\{POSTGRES_APP_USER\}:\$\{POSTGRES_APP_PASSWORD\}@db:/);
-    expect(api).not.toMatch(/DATABASE_URL:\s*postgresql:\/\/\$\{POSTGRES_USER\}/);
-    expect(api).toMatch(/db-init:\n\s+condition: service_completed_successfully/);
-  });
-
-  it("creates a non-superuser runtime role with data access but no schema creation", () => {
-    const initializer = readFileSync("scripts/ensure-runtime-db-user.sh", "utf8");
-    expect(initializer).toContain("NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION");
-    expect(initializer).toContain("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
-    expect(initializer).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES");
-    expect(initializer).not.toContain("GRANT ALL PRIVILEGES");
+    const migrate = serviceBlock("migrate");
+    expect(api).toContain("DATABASE_URL: file:/app/data/presensi.db");
+    expect(api).toContain("sqlite_data:/app/data");
+    expect(migrate).toContain("sqlite_data:/app/data");
+    expect(productionCompose).toContain("name: ${VOLUME_PREFIX:-presensi}_sqlite_data");
+    expect(productionCompose).not.toContain("postgres");
   });
 });

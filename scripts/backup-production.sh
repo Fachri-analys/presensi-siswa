@@ -20,17 +20,20 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
-DB_BACKUP="$BACKUP_DIR/presensi-db-$STAMP.dump"
+DB_BACKUP="$BACKUP_DIR/presensi-db-$STAMP.sqlite"
 UPLOADS_BACKUP="$BACKUP_DIR/presensi-uploads-$STAMP.tar.gz"
 DB_TEMP="$DB_BACKUP.partial"
 UPLOADS_TEMP="$UPLOADS_BACKUP.partial"
+CONTAINER_DB_BACKUP="/app/data/presensi-backup-$STAMP.sqlite"
 
 cleanup() {
   rm -f "$DB_TEMP" "$UPLOADS_TEMP"
+  compose exec -T api rm -f "$CONTAINER_DB_BACKUP" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$DB_TEMP"
+compose exec -T api node --experimental-sqlite /app/scripts/backup-sqlite.mjs "$CONTAINER_DB_BACKUP"
+compose exec -T api cat "$CONTAINER_DB_BACKUP" > "$DB_TEMP"
 compose exec -T api tar -czf - -C /app/uploads . > "$UPLOADS_TEMP"
 
 if [ ! -s "$DB_TEMP" ] || [ ! -s "$UPLOADS_TEMP" ]; then

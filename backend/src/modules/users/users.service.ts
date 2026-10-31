@@ -32,8 +32,8 @@ export class UsersService {
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
-        { nama: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
+        { nama: { contains: search } },
+        { email: { contains: search } },
       ];
     }
 

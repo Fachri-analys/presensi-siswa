@@ -3,6 +3,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+RUN mkdir -p /app/data && chown 1001:1001 /app/data && chmod 700 /app/data
+
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -28,9 +30,10 @@ COPY --chown=nestjs:nodejs prisma ./prisma/
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --chown=nestjs:nodejs --from=builder /app/dist ./dist
+COPY --chown=nestjs:nodejs --from=builder /app/scripts ./scripts
 COPY --chown=nestjs:nodejs --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
+RUN mkdir -p /app/uploads /app/data && chown -R nestjs:nodejs /app/uploads /app/data && chmod 700 /app/data
 
 USER nestjs
 

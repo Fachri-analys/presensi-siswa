@@ -30,8 +30,8 @@ export class StudentsService {
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
-        { nis: { contains: search, mode: 'insensitive' } },
-        { nama: { contains: search, mode: 'insensitive' } },
+        { nis: { contains: search } },
+        { nama: { contains: search } },
       ];
     }
 

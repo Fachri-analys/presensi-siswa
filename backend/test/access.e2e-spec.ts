@@ -70,21 +70,9 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
     }
   });
 
-  it('API memakai role database tanpa hak superuser atau CREATE schema', async () => {
-    const [role] = await prisma.$queryRaw<Array<{
-      isSuperuser: boolean;
-      canCreateSchema: boolean;
-      canReadUsers: boolean;
-    }>>`
-      SELECT
-        role.rolsuper AS "isSuperuser",
-        has_schema_privilege(current_user, 'public', 'CREATE') AS "canCreateSchema",
-        has_table_privilege(current_user, 'public.users', 'SELECT') AS "canReadUsers"
-      FROM pg_roles role
-      WHERE role.rolname = current_user
-    `;
-
-    expect(role).toEqual({ isSuperuser: false, canCreateSchema: false, canReadUsers: true });
+  it('SQLite enforces declared foreign keys', async () => {
+    const [result] = await prisma.$queryRaw<Array<{ foreign_keys: bigint }>>`PRAGMA foreign_keys`;
+    expect(Number(result.foreign_keys)).toBe(1);
   });
 
   it('Admin GET /students = 200', async () => {
@@ -93,6 +81,18 @@ describe('Akses E2E Tests (Blok 0, B1, B2)', () => {
       .set('Cookie', adminCookies);
 
     expect(response.status).toBe(200);
+  });
+
+  it('pencarian siswa tetap tidak peka huruf besar kecil ASCII di SQLite', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/students')
+      .query({ search: 'siswa kelas b e2e' })
+      .set('Cookie', adminCookies);
+
+    expect(response.status).toBe(200);
+    expect(response.body.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ nis: 'e2e-student-kelas-b' })]),
+    );
   });
 
   it('Guru Piket dapat membaca siswa tetapi tidak dapat membuat data siswa', async () => {
