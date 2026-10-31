@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import type { SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { useRole } from "@/components/app-shell";
@@ -27,6 +27,7 @@ export function GuruPiketStudents({
   const { role } = useRole();
   const isAdmin = role === "ADMIN";
   const [students, setStudents] = useState<ManagedStudent[]>([]);
+  const [total, setTotal] = useState(0);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | StudentStatus>("all");
@@ -37,19 +38,46 @@ export function GuruPiketStudents({
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     const repo = createApiSchoolRepository();
     if (!repo) { setToast("Backend belum dikonfigurasi."); return; }
     try {
-      const [studentsPage, classesPage] = await Promise.all([
-        repo.listStudents({ limit: 100, kelasId: fixedClassId, status: isAdmin ? "all" : "active" }),
-        repo.listClasses(),
-      ]);
-      setStudents(studentsPage.items); setClasses(classesPage.items);
-    } catch (err: unknown) { setToast(`Gagal memuat data: ${apiErrorMessage(err)}`); }
-  }, [fixedClassId, isAdmin]);
+      const selectedClassId = fixedClassId ?? (classFilter === "all" ? undefined : classFilter);
+      const studentsPage = await repo.listStudents({
+        cursor: String(page),
+        limit: PAGE_SIZE,
+        search: query.trim() || undefined,
+        kelasId: selectedClassId,
+        status: isAdmin ? statusFilter : "active",
+      }, signal);
+      if (signal?.aborted) return;
+      const lastPage = Math.max(1, Math.ceil(studentsPage.total / PAGE_SIZE));
+      if (page > lastPage) { setPage(lastPage); return; }
+      setStudents(studentsPage.items);
+      setTotal(studentsPage.total);
+    } catch (err: unknown) {
+      if (!signal?.aborted) setToast(`Gagal memuat data: ${apiErrorMessage(err)}`);
+    }
+  }, [classFilter, fixedClassId, isAdmin, page, query, statusFilter]);
 
-  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.resolve().then(() => refresh(controller.signal));
+    return () => controller.abort();
+  }, [refresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const repo = createApiSchoolRepository();
+    if (repo) {
+      void repo.listClasses(undefined, controller.signal)
+        .then((classesPage) => setClasses(classesPage.items))
+        .catch((err: unknown) => {
+          if (!controller.signal.aborted) setToast(`Gagal memuat kelas: ${apiErrorMessage(err)}`);
+        });
+    }
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -57,17 +85,7 @@ export function GuruPiketStudents({
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const filtered = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return students.filter((student) =>
-      (isAdmin || student.status === "active") &&
-      (statusFilter === "all" || student.status === statusFilter) &&
-      (fixedClassId ? student.kelasId === fixedClassId : classFilter === "all" || student.kelasId === classFilter) &&
-      (!search || `${student.nis} ${student.nama} ${getClassName(classes, student.kelasId)}`.toLowerCase().includes(search))
-    );
-  }, [students, classes, query, statusFilter, classFilter, fixedClassId, isAdmin]);
-  const current = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
-  const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const visible = students;
 
   async function completeAction() {
     if (!pending) return;
@@ -130,7 +148,7 @@ export function GuruPiketStudents({
       setFormError("NIS ini sudah terdaftar. Periksa kembali angkanya.");
       return;
     }
-    if (!nama || !classes.some((item) => item.id === kelasId)) {
+    if (!nama || !classes.some((item) => item.id === kelasId && (item.active || item.id === editing?.kelasId))) {
       setFormError("Nama siswa dan kelas wajib diisi dengan benar.");
       return;
     }
@@ -190,7 +208,7 @@ export function GuruPiketStudents({
             Kelas
             <select value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1); }} className={field}>
               <option value="all">Semua kelas</option>
-              {classes.map((item) => <option key={item.id} value={item.id}>{item.nama}</option>)}
+              {classes.filter((item) => item.active || item.id === editing?.kelasId).map((item) => <option key={item.id} value={item.id}>{item.nama}{item.active ? "" : " (nonaktif)"}</option>)}
             </select>
           </label>}
         {isAdmin && <label className="grid gap-1 text-xs font-medium text-muted">
@@ -210,7 +228,7 @@ export function GuruPiketStudents({
       )}
 
       <div className={`${card} overflow-hidden`}>
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <EmptyState title="Siswa tidak ditemukan" description="Coba periksa kembali kata kunci, kelas, atau status yang dipilih." />
         ) : (
           <div className="overflow-x-auto">
@@ -247,7 +265,7 @@ export function GuruPiketStudents({
             </table>
           </div>
         )}
-        {filtered.length > PAGE_SIZE && <Pagination page={current} pageSize={PAGE_SIZE} total={filtered.length} unit="siswa" onChange={setPage} />}
+        {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} total={total} unit="siswa" onChange={setPage} />}
       </div>
 
       {isAdmin && <Dialog open={Boolean(statusDialog)} title={pending?.kind === "deactivate" ? "Nonaktifkan data siswa?" : "Aktifkan kembali data siswa?"} onClose={() => setPending(null)}>

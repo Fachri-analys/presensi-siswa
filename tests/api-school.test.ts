@@ -86,6 +86,25 @@ describe("api-school repository integration", () => {
     expect(parsedUrl.searchParams.get("kelasId")).toBe("cls-1");
   });
 
+  it("listStudents() mengirim halaman dan status ke backend untuk paginasi server-side", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], nextCursor: null, total: 125 }), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    );
+    const repo = createApiSchoolRepository(fetcher)!;
+
+    const result = await repo.listStudents({ cursor: "3", limit: 10, status: "inactive" });
+
+    expect(result.total).toBe(125);
+    const [url] = fetcher.mock.calls[0];
+    const parsedUrl = new URL(String(url));
+    expect(parsedUrl.searchParams.get("page")).toBe("3");
+    expect(parsedUrl.searchParams.get("limit")).toBe("10");
+    expect(parsedUrl.searchParams.get("status")).toBe("inactive");
+  });
+
   // [INT-SCH-04] Set student active status
   it("[INT-SCH-04] setStudentActive() mengirim status perubahan ke PATCH /students/:id", async () => {
     const mockUpdated = { id: "std-1", nis: "241101", nama: "Ahmad", kelasId: "cls-1", status: "inactive" };

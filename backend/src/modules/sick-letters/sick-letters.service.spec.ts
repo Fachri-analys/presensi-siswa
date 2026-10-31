@@ -4,12 +4,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as fs from 'fs';
+import * as path from 'path';
 
 jest.mock('fs', () => ({
   ...jest.requireActual('fs'),
   existsSync: jest.fn().mockReturnValue(true),
   mkdirSync: jest.fn(),
   writeFileSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 
 describe('SickLettersService (Keamanan Upload File)', () => {
@@ -176,5 +178,16 @@ describe('SickLettersService (Keamanan Upload File)', () => {
       take: 20,
     }));
     expect(result).toMatchObject({ total: 51, page: 2, limit: 20, totalPages: 3, nextCursor: '3' });
+  });
+
+  it('[PRIVACY-02] removeFiles() hanya menghapus file langsung di direktori upload', () => {
+    const uploadDir = path.resolve(process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads'));
+    const allowedFile = path.join(uploadDir, 'letter.pdf');
+    const outsideFile = path.join(uploadDir, '..', 'outside.pdf');
+
+    service.removeFiles([allowedFile, outsideFile]);
+
+    expect(fs.rmSync).toHaveBeenCalledWith(allowedFile, { force: true });
+    expect(fs.rmSync).not.toHaveBeenCalledWith(path.resolve(outsideFile), { force: true });
   });
 });

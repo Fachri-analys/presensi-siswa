@@ -62,6 +62,12 @@ Script membuat snapshot SQLite konsisten dengan `VACUUM INTO`, menjalankan `PRAG
 
 Salin hasil backup ke penyimpanan di luar server dengan enkripsi dan retensi yang ditetapkan sekolah. Backup yang hanya berada di server yang sama tidak melindungi dari kerusakan/hilangnya server.
 
+Untuk memeriksa konsistensi file lampiran dengan metadata SQLite, jalankan `DATABASE_URL=file:/app/data/presensi.db UPLOAD_DIR=/app/uploads npm run uploads:audit` dari container API atau lingkungan yang mengakses volume yang sama. Perintah ini hanya melaporkan file yatim dan metadata tanpa file; perintah ini tidak menghapus data.
+
+Skrip beban hanya boleh diarahkan ke lokal atau staging dengan data uji. Atur `LOAD_TEST_EMAIL` dan `LOAD_TEST_PASSWORD` untuk akun uji Admin, lalu jalankan dari direktori `backend`, misalnya `node scripts/load-test.mjs --host https://staging.example.sch.id --users 5 --duration 10 --min-rps 0`. Mulai dengan concurrency rendah dan jangan arahkan skrip ke production.
+
+Menghapus siswa secara permanen juga menghapus metadata dan file surat sakit terkait. Pastikan prosedur retensi sekolah mengizinkan penghapusan tersebut; jika surat wajib disimpan, nonaktifkan/arsipkan siswa sampai masa retensi selesai.
+
 Uji pemulihan pada volume staging terpisah. Buat `.env.staging` dari template, ubah `VOLUME_PREFIX=presensi-staging`, nama domain staging, dan port host. Jalankan stack staging dengan project dan env file terpisah:
 
 ```sh

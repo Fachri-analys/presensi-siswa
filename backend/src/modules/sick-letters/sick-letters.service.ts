@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -31,6 +32,7 @@ export interface UploadFile {
 
 @Injectable()
 export class SickLettersService {
+  private readonly logger = new Logger(SickLettersService.name);
   private readonly uploadDir: string;
 
   constructor(private readonly prisma: PrismaService) {
@@ -254,5 +256,21 @@ export class SickLettersService {
       throw new NotFoundException('Berkas surat tidak ditemukan.');
     }
     return { filePath, fileName: letter.fileName, mimeType: letter.mimeType };
+  }
+
+  removeFiles(filePaths: string[]) {
+    const uploadRoot = path.resolve(this.uploadDir);
+    for (const filePath of filePaths) {
+      const absolutePath = path.resolve(filePath);
+      if (path.dirname(absolutePath) !== uploadRoot) {
+        this.logger.warn('Lampiran siswa dilewati karena path berada di luar direktori upload.');
+        continue;
+      }
+      try {
+        fs.rmSync(absolutePath, { force: true });
+      } catch (error) {
+        this.logger.error(`Gagal menghapus lampiran ${path.basename(absolutePath)}.`, error);
+      }
+    }
   }
 }

@@ -135,6 +135,7 @@ export function decodeClass(value: unknown): SchoolClass {
     jurusan: text(data.jurusan, "class.jurusan"),
     ketuaAkunId: optionalText(data.ketuaAkunId, "class.ketuaAkunId"),
     active: boolean(data.active, "class.active"),
+    ...(data.totalSiswa === undefined ? {} : { totalSiswa: nonNegativeInteger(data.totalSiswa, "class.totalSiswa") }),
   };
 }
 

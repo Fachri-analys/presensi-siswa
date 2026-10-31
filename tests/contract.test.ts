@@ -27,6 +27,7 @@ describe("Test Kontrak FE-BE dengan respons Backend Asli (F4 & B5)", () => {
     expect(decoded.jurusan).toBe("Pengembangan Perangkat Lunak dan Gim");
     expect(decoded.active).toBe(true);
     expect(decoded.ketuaAkunId).toBe("usr-ketua-1");
+    expect(decoded.totalSiswa).toBe(32);
   });
 
   it("[CONTRACT-02] decodeAttendanceReport berhasil memproses respons getRecap backend lengkap", () => {

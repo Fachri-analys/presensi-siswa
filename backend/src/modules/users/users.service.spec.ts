@@ -22,6 +22,7 @@ describe('UsersService (Account Management & Security)', () => {
       session: {
         deleteMany: jest.fn(),
       },
+      $transaction: jest.fn((callback) => callback(mockPrisma)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -93,6 +94,43 @@ describe('UsersService (Account Management & Security)', () => {
     await expect(
       service.update('usr-1', { email: 'existing@test.com' }),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('[USER-05] update() tidak dapat menonaktifkan Admin aktif terakhir', async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      id: 'admin-1', email: 'admin@test.com', nama: 'Admin', role: Role.ADMIN,
+      status: ActiveStatus.active, kelasId: null, createdAt: new Date(), updatedAt: new Date(),
+    });
+    mockPrisma.user.count.mockResolvedValueOnce(1);
+
+    await expect(service.update('admin-1', { status: ActiveStatus.inactive }))
+      .rejects.toThrow(ConflictException);
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('[USER-06] remove() tidak dapat menghapus Admin aktif terakhir', async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      id: 'admin-1', email: 'admin@test.com', nama: 'Admin', role: Role.ADMIN,
+      status: ActiveStatus.active, kelasId: null, createdAt: new Date(), updatedAt: new Date(),
+    });
+    mockPrisma.user.count.mockResolvedValueOnce(1);
+
+    await expect(service.remove('admin-1')).rejects.toThrow(ConflictException);
+    expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('[USER-07] tetap mengizinkan perubahan Admin bila Admin aktif lain masih ada', async () => {
+    const admin = {
+      id: 'admin-1', email: 'admin@test.com', nama: 'Admin', role: Role.ADMIN,
+      status: ActiveStatus.active, kelasId: null, createdAt: new Date(), updatedAt: new Date(),
+    };
+    mockPrisma.user.findUnique.mockResolvedValueOnce(admin);
+    mockPrisma.user.count.mockResolvedValueOnce(2);
+    mockPrisma.user.update.mockResolvedValueOnce({ ...admin, status: ActiveStatus.inactive });
+
+    await expect(service.update('admin-1', { status: ActiveStatus.inactive }))
+      .resolves.toMatchObject({ active: false });
+    expect(mockPrisma.user.update).toHaveBeenCalled();
   });
 
 });

@@ -1,13 +1,18 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ActiveStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentDto } from './dto/query-student.dto';
 import { Prisma } from '@prisma/client';
+import { SickLettersService } from '../sick-letters/sick-letters.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sickLetters: SickLettersService,
+  ) {}
 
   async findAll(query: QueryStudentDto, restrictedClassId?: string | null) {
     const page = query.page ?? 1;
@@ -86,6 +91,9 @@ export class StudentsService {
     if (!classExists) {
       throw new NotFoundException(`Kelas dengan ID "${dto.kelasId}" tidak ditemukan.`);
     }
+    if (classExists.status !== ActiveStatus.active) {
+      throw new ConflictException('Siswa hanya dapat ditambahkan ke kelas yang aktif.');
+    }
 
     // Cek duplikasi NIS
     const existingNis = await this.prisma.student.findUnique({
@@ -106,7 +114,7 @@ export class StudentsService {
   }
 
   async update(id: string, dto: UpdateStudentDto) {
-    await this.findOne(id);
+    const student = await this.findOne(id);
 
     if (dto.kelasId) {
       const classExists = await this.prisma.class.findUnique({
@@ -114,6 +122,9 @@ export class StudentsService {
       });
       if (!classExists) {
         throw new NotFoundException(`Kelas dengan ID "${dto.kelasId}" tidak ditemukan.`);
+      }
+      if (classExists.status !== ActiveStatus.active && student.kelasId !== dto.kelasId) {
+        throw new ConflictException('Siswa hanya dapat dipindahkan ke kelas yang aktif.');
       }
     }
 
@@ -135,8 +146,15 @@ export class StudentsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.student.delete({
-      where: { id },
+    const filePaths = await this.prisma.$transaction(async (tx) => {
+      const letters = await tx.sickLetter.findMany({
+        where: { studentId: id },
+        select: { filePath: true },
+      });
+      await tx.student.delete({ where: { id } });
+      return letters.map((letter) => letter.filePath);
     });
+    await this.sickLetters.removeFiles(filePaths);
+    return { success: true };
   }
 }

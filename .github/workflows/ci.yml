@@ -87,6 +87,10 @@ jobs:
         run: npm audit --audit-level=high
         working-directory: backend
 
+      - name: Check backend operational scripts
+        run: node --check scripts/load-test.mjs && node --check scripts/audit-upload-files.mjs
+        working-directory: backend
+
       - name: Generate Prisma client
         run: npx prisma generate
         working-directory: backend

@@ -1,16 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StudentsService } from './students.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SickLettersService } from '../sick-letters/sick-letters.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ActiveStatus } from '@prisma/client';
 
 describe('StudentsService (CRUD, IDOR, N+1)', () => {
   let service: StudentsService;
   let mockPrisma: any;
+  let mockSickLetters: { removeFiles: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
-      $transaction: jest.fn(),
+      $transaction: jest.fn((callback) => callback(mockPrisma)),
       student: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -22,12 +24,17 @@ describe('StudentsService (CRUD, IDOR, N+1)', () => {
       class: {
         findUnique: jest.fn(),
       },
+      sickLetter: {
+        findMany: jest.fn(),
+      },
     };
+    mockSickLetters = { removeFiles: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StudentsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SickLettersService, useValue: mockSickLetters },
       ],
     }).compile();
 
@@ -36,7 +43,7 @@ describe('StudentsService (CRUD, IDOR, N+1)', () => {
 
   // [CRUD-01] Tambah siswa baru dengan NIS unik berhasil
   it('[CRUD-01] create() berhasil menambahkan siswa jika kelas ada dan NIS unik', async () => {
-    mockPrisma.class.findUnique.mockResolvedValueOnce({ id: 'cls-1', nama: 'XI PPLG 1' });
+    mockPrisma.class.findUnique.mockResolvedValueOnce({ id: 'cls-1', nama: 'XI PPLG 1', status: ActiveStatus.active });
     mockPrisma.student.findUnique.mockResolvedValueOnce(null);
     mockPrisma.student.create.mockResolvedValueOnce({
       id: 'std-1',
@@ -76,6 +83,14 @@ describe('StudentsService (CRUD, IDOR, N+1)', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('[CRUD-05] create() menolak kelas nonaktif', async () => {
+    mockPrisma.class.findUnique.mockResolvedValueOnce({ id: 'cls-1', status: ActiveStatus.inactive });
+
+    await expect(service.create({ nis: '241103', nama: 'Citra', kelasId: 'cls-1' }))
+      .rejects.toThrow(ConflictException);
+    expect(mockPrisma.student.create).not.toHaveBeenCalled();
+  });
+
   // [CRUD-04] Update data siswa berhasil
   it('[CRUD-04] update() berhasil memperbarui data siswa', async () => {
     mockPrisma.student.findUnique
@@ -90,6 +105,41 @@ describe('StudentsService (CRUD, IDOR, N+1)', () => {
 
     const result = await service.update('std-1', { nama: 'Ahmad Fauzi Updated' });
     expect(result.nama).toBe('Ahmad Fauzi Updated');
+  });
+
+  it('[CRUD-06] update() menolak memindahkan siswa ke kelas nonaktif', async () => {
+    mockPrisma.student.findUnique.mockResolvedValueOnce({ id: 'std-1', nis: '241101', kelasId: 'cls-old' });
+    mockPrisma.class.findUnique.mockResolvedValueOnce({ id: 'cls-new', status: ActiveStatus.inactive });
+
+    await expect(service.update('std-1', { kelasId: 'cls-new' })).rejects.toThrow(ConflictException);
+    expect(mockPrisma.student.update).not.toHaveBeenCalled();
+  });
+
+  it('[CRUD-07] update() mempertahankan siswa pada kelas nonaktif yang sama', async () => {
+    mockPrisma.student.findUnique.mockResolvedValueOnce({ id: 'std-1', nis: '241101', kelasId: 'cls-old' });
+    mockPrisma.class.findUnique.mockResolvedValueOnce({ id: 'cls-old', status: ActiveStatus.inactive });
+    mockPrisma.student.update.mockResolvedValueOnce({ id: 'std-1', nama: 'Siswa diperbarui' });
+
+    await expect(service.update('std-1', { kelasId: 'cls-old' })).resolves.toBeDefined();
+  });
+
+  it('[PRIVACY-01] remove() menghapus file surat sakit setelah siswa berhasil dihapus', async () => {
+    mockPrisma.student.findUnique.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
+    mockPrisma.sickLetter.findMany.mockResolvedValueOnce([{ filePath: 'uploads/letter.pdf' }]);
+    mockPrisma.student.delete.mockResolvedValueOnce({ id: 'std-1' });
+
+    await service.remove('std-1');
+
+    expect(mockSickLetters.removeFiles).toHaveBeenCalledWith(['uploads/letter.pdf']);
+  });
+
+  it('[PRIVACY-03] remove() mempertahankan lampiran jika penghapusan siswa gagal', async () => {
+    mockPrisma.student.findUnique.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
+    mockPrisma.sickLetter.findMany.mockResolvedValueOnce([{ filePath: 'uploads/letter.pdf' }]);
+    mockPrisma.student.delete.mockRejectedValueOnce(new Error('attendance restrict'));
+
+    await expect(service.remove('std-1')).rejects.toThrow('attendance restrict');
+    expect(mockSickLetters.removeFiles).not.toHaveBeenCalled();
   });
 
   // [SEC-IDOR-01] Query siswa membatasi kelas otomatis untuk Ketua Kelas

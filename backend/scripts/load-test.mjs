@@ -1,217 +1,145 @@
 #!/usr/bin/env node
-/**
- * Load Test Script — Sistem Presensi Siswa
- *
- * Menggunakan native Node.js HTTP untuk load testing tanpa dependency eksternal.
- *
- * Usage:
- *   node backend/scripts/load-test.mjs --users 100 --duration 30
- *   node backend/scripts/load-test.mjs --users 300 --duration 30
- *   node backend/scripts/load-test.mjs --users 800 --duration 30
- *   node backend/scripts/load-test.mjs --host http://localhost:3000 --users 100
- *
- * Pastikan backend sudah berjalan sebelum menjalankan script ini.
- */
+/** Run only against a local or staging API with test data. */
 
-import http from 'node:http';
-import { URL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 
-// ─── Parse CLI args ──────────────────────────────────────────
 const args = process.argv.slice(2);
-function getArg(name, fallback) {
-  const idx = args.indexOf(`--${name}`);
-  return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
+const getArg = (name, fallback) => {
+  const index = args.indexOf(`--${name}`);
+  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
+};
+const positiveInt = (name, fallback, max) => {
+  const value = Number(getArg(name, fallback));
+  if (!Number.isInteger(value) || value < 1 || value > max) {
+    throw new Error(`--${name} harus berupa bilangan bulat 1–${max}.`);
+  }
+  return value;
+};
+
+const host = new URL(getArg('host', process.env.LOAD_TEST_HOST ?? 'http://localhost:4000'));
+if (!['http:', 'https:'].includes(host.protocol)) throw new Error('--host harus menggunakan HTTP atau HTTPS.');
+const users = positiveInt('users', '20', 1000);
+const durationSeconds = positiveInt('duration', '10', 600);
+const maxReadP95 = positiveInt('max-read-p95-ms', '500', 60000);
+const minRps = Number(getArg('min-rps', '50'));
+const maxErrorRate = Number(getArg('max-error-rate', '1'));
+if (!Number.isFinite(minRps) || minRps < 0 || !Number.isFinite(maxErrorRate) || maxErrorRate < 0 || maxErrorRate > 100) {
+  throw new Error('--min-rps atau --max-error-rate tidak valid.');
 }
 
-const HOST = getArg('host', 'http://localhost:3000');
-const USERS = parseInt(getArg('users', '100'), 10);
-const DURATION_S = parseInt(getArg('duration', '30'), 10);
+const SAMPLE_LIMIT = 50_000;
 
-console.log(`\n🔧 Load Test Configuration`);
-console.log(`   Host:     ${HOST}`);
-console.log(`   Users:    ${USERS} concurrent`);
-console.log(`   Duration: ${DURATION_S}s\n`);
-
-// ─── HTTP Request Helper ─────────────────────────────────────
-function makeRequest(path, method = 'GET', body = null, cookie = '') {
-  return new Promise((resolve) => {
-    const url = new URL(path, HOST);
-    const start = performance.now();
-
-    const options = {
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
+async function send(path, { method = 'GET', body, cookie } = {}) {
+  const started = performance.now();
+  try {
+    const response = await fetch(new URL(path, host), {
       method,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(cookie ? { Cookie: cookie } : {}),
+        accept: 'application/json',
+        ...(body ? { 'content-type': 'application/json' } : {}),
+        ...(cookie ? { cookie } : {}),
       },
-      timeout: 30000,
-    };
-
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        const latency = performance.now() - start;
-        resolve({
-          status: res.statusCode,
-          latency,
-          success: res.statusCode >= 200 && res.statusCode < 400,
-          data,
-        });
-      });
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(30_000),
+      redirect: 'error',
     });
-
-    req.on('error', () => {
-      resolve({
-        status: 0,
-        latency: performance.now() - start,
-        success: false,
-        data: '',
-      });
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({
-        status: 0,
-        latency: performance.now() - start,
-        success: false,
-        data: '',
-      });
-    });
-
-    if (body) {
-      req.write(JSON.stringify(body));
-    }
-    req.end();
-  });
+    return { status: response.status, latency: performance.now() - started, success: response.status >= 200 && response.status < 300 };
+  } catch {
+    return { status: 0, latency: performance.now() - started, success: false };
+  }
 }
 
-// ─── Stat Collector ──────────────────────────────────────────
-class StatCollector {
-  constructor(name) {
-    this.name = name;
-    this.latencies = [];
-    this.successes = 0;
-    this.failures = 0;
-  }
+class Stats {
+  total = 0;
+  failures = 0;
+  sum = 0;
+  samples = [];
 
   record(result) {
-    this.latencies.push(result.latency);
-    if (result.success) this.successes++;
-    else this.failures++;
+    this.total++;
+    this.sum += result.latency;
+    if (!result.success) this.failures++;
+    if (this.samples.length < SAMPLE_LIMIT) this.samples.push(result.latency);
+    else {
+      const slot = Math.floor(Math.random() * this.total);
+      if (slot < SAMPLE_LIMIT) this.samples[slot] = result.latency;
+    }
   }
 
-  report() {
-    const sorted = [...this.latencies].sort((a, b) => a - b);
-    const total = sorted.length;
-    if (total === 0) {
-      return { endpoint: this.name, total: 0, ok: 0, fail: 0, rps: 0, avg: 0, p50: 0, p95: 0, p99: 0, errRate: '0%' };
-    }
-    const sum = sorted.reduce((a, b) => a + b, 0);
-    const p = (pct) => sorted[Math.min(Math.floor(total * pct), total - 1)];
+  report(name) {
+    const sorted = this.samples.toSorted((a, b) => a - b);
+    const percentile = (fraction) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
     return {
-      endpoint: this.name,
-      total,
-      ok: this.successes,
+      endpoint: name,
+      total: this.total,
       fail: this.failures,
-      rps: (total / DURATION_S).toFixed(1),
-      avg: (sum / total).toFixed(1),
-      p50: p(0.5).toFixed(1),
-      p95: p(0.95).toFixed(1),
-      p99: p(0.99).toFixed(1),
-      errRate: ((this.failures / total) * 100).toFixed(2) + '%',
+      rps: this.total / durationSeconds,
+      avg: this.total ? this.sum / this.total : 0,
+      p95: percentile(0.95),
+      errorRate: this.total ? (this.failures / this.total) * 100 : 100,
     };
   }
 }
 
-// ─── Test Scenarios ──────────────────────────────────────────
-const endpoints = [
-  { name: 'GET /health', path: '/health', method: 'GET' },
-  { name: 'POST /auth/login', path: '/api/v1/auth/login', method: 'POST', body: { email: 'admin@test.local', password: 'Test1234!' } },
-  { name: 'GET /students', path: '/api/v1/students?page=1&limit=20', method: 'GET' },
-  { name: 'GET /classes', path: '/api/v1/classes?page=1&limit=20', method: 'GET' },
-];
+async function login() {
+  const email = process.env.LOAD_TEST_EMAIL;
+  const password = process.env.LOAD_TEST_PASSWORD;
+  if (!email || !password) throw new Error('Atur LOAD_TEST_EMAIL dan LOAD_TEST_PASSWORD untuk endpoint yang memerlukan autentikasi.');
+  const response = await fetch(new URL('/api/v1/auth/login', host), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json', origin: host.origin },
+    body: JSON.stringify({ email, password }),
+    signal: AbortSignal.timeout(30_000),
+    redirect: 'error',
+  });
+  if (!response.ok) throw new Error(`Login uji gagal dengan HTTP ${response.status}.`);
+  const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];
+  if (!cookie) throw new Error('Login uji berhasil tetapi cookie sesi tidak ditemukan.');
+  return cookie;
+}
 
-async function runEndpointTest(endpoint, concurrency, durationMs) {
-  const stats = new StatCollector(endpoint.name);
-  const endTime = performance.now() + durationMs;
-
+async function runEndpoint(name, path, cookie) {
+  const stats = new Stats();
+  const endAt = performance.now() + durationSeconds * 1000;
   async function worker() {
-    while (performance.now() < endTime) {
-      const result = await makeRequest(
-        endpoint.path,
-        endpoint.method,
-        endpoint.body || null,
-      );
-      stats.record(result);
-    }
+    while (performance.now() < endAt) stats.record(await send(path, { cookie }));
   }
-
-  const workers = Array.from({ length: concurrency }, () => worker());
-  await Promise.all(workers);
-  return stats.report();
+  await Promise.all(Array.from({ length: users }, () => worker()));
+  return stats.report(name);
 }
 
-// ─── Main ────────────────────────────────────────────────────
 async function main() {
-  console.log('━'.repeat(80));
-  console.log(`🚀 Starting load test with ${USERS} concurrent users, ${DURATION_S}s per endpoint`);
-  console.log('━'.repeat(80));
-
+  const health = await send('/health');
+  if (!health.success) throw new Error(`Health check gagal dengan HTTP ${health.status}.`);
+  const cookie = await login();
   const results = [];
+  results.push(await runEndpoint('GET /health', '/health'));
+  results.push(await runEndpoint('GET /students', '/api/v1/students?page=1&limit=20', cookie));
+  results.push(await runEndpoint('GET /classes', '/api/v1/classes', cookie));
 
-  for (const endpoint of endpoints) {
-    console.log(`\n⏳ Testing: ${endpoint.name} ...`);
-    const report = await runEndpointTest(endpoint, USERS, DURATION_S * 1000);
-    results.push(report);
-    console.log(`   ✅ ${report.total} requests | ${report.rps} req/s | p95=${report.p95}ms | err=${report.errRate}`);
-  }
+  console.log(`Host ${host.origin} | ${users} concurrent users | ${durationSeconds}s per endpoint`);
+  console.table(results.map((result) => ({
+    endpoint: result.endpoint,
+    requests: result.total,
+    failures: result.fail,
+    'req/s': result.rps.toFixed(1),
+    'avg ms': result.avg.toFixed(1),
+    'p95 ms': result.p95.toFixed(1),
+    'error %': result.errorRate.toFixed(2),
+  })));
 
-  // Print summary table
-  console.log('\n' + '━'.repeat(80));
-  console.log('📊 LOAD TEST RESULTS SUMMARY');
-  console.log('━'.repeat(80));
-  console.log(
-    'Endpoint'.padEnd(25) +
-    'Total'.padStart(8) +
-    'OK'.padStart(8) +
-    'Fail'.padStart(8) +
-    'RPS'.padStart(8) +
-    'Avg(ms)'.padStart(10) +
-    'P50(ms)'.padStart(10) +
-    'P95(ms)'.padStart(10) +
-    'P99(ms)'.padStart(10) +
-    'Err%'.padStart(8)
+  const failed = results.filter((result) =>
+    result.total === 0 || result.p95 >= maxReadP95 || result.errorRate > maxErrorRate || result.rps < minRps,
   );
-  console.log('─'.repeat(105));
-
-  for (const r of results) {
-    console.log(
-      r.endpoint.padEnd(25) +
-      String(r.total).padStart(8) +
-      String(r.ok).padStart(8) +
-      String(r.fail).padStart(8) +
-      String(r.rps).padStart(8) +
-      String(r.avg).padStart(10) +
-      String(r.p50).padStart(10) +
-      String(r.p95).padStart(10) +
-      String(r.p99).padStart(10) +
-      String(r.errRate).padStart(8)
-    );
+  if (failed.length) {
+    console.error(`GAGAL: target p95 < ${maxReadP95} ms, error <= ${maxErrorRate}%, req/s >= ${minRps}.`);
+    process.exitCode = 1;
+  } else {
+    console.log('LULUS: seluruh endpoint memenuhi ambang.');
   }
-
-  console.log('─'.repeat(105));
-  console.log('\n📋 Thresholds:');
-  console.log('   ✅ P95 < 500ms for reads (GET)');
-  console.log('   ✅ P95 < 1000ms for writes (POST/PUT)');
-  console.log('   ✅ Error rate < 1%');
-  console.log('   ✅ Throughput > 50 req/s per endpoint\n');
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(`Load test dihentikan: ${error.message}`);
+  process.exitCode = 1;
+});

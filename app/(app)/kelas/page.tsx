@@ -12,7 +12,6 @@ import { Badge, btn, card, EmptyState, field } from "@/components/ui";
 export default function KelasPage() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [leaders, setLeaders] = useState<SchoolAccount[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState<SchoolClass | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,12 +22,11 @@ export default function KelasPage() {
     const admin = createApiAdminRepository();
     if (!school || !admin) { setError("Backend belum dikonfigurasi."); return; }
     try {
-      const [classPage, accountPage, studentPage] = await Promise.all([
-        school.listClasses(), admin.listAccounts({ limit: 100 }), school.listStudents({ limit: 100 }),
+      const [classPage, accountPage] = await Promise.all([
+        school.listClasses(), admin.listAccounts({ limit: 100 }),
       ]);
       setClasses(classPage.items);
       setLeaders(accountPage.items.filter((account) => account.role === "KETUA_KELAS" && account.active));
-      setCounts(Object.fromEntries(classPage.items.map((item) => [item.id, studentPage.items.filter((student) => student.kelasId === item.id && student.status === "active").length])));
       setError(null);
     } catch (err: unknown) { setError(apiErrorMessage(err)); }
   }, []);
@@ -70,7 +68,7 @@ export default function KelasPage() {
     {error && <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
     {message && <p role="status" className="rounded-md bg-success-soft px-4 py-3 text-sm text-success">{message}</p>}
     <section className={`${card} overflow-x-auto`}><table className="w-full min-w-180 text-sm"><thead><tr className="bg-primary-soft text-left text-xs font-semibold text-muted">{["Kelas", "Jurusan", "Siswa aktif", "Ketua Kelas", "Status", "Aksi"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-line">
-      {classes.map((item) => <tr key={item.id}><td className="px-4 py-3 font-semibold">{item.nama}</td><td className="px-4 py-3">{item.jurusan}</td><td className="px-4 py-3">{counts[item.id] ?? "—"}</td><td className="px-4 py-3"><select aria-label={`Ketua kelas ${item.nama}`} value={item.ketuaAkunId ?? ""} onChange={(event) => void assignLeader(item.id, event.target.value)} className={field}><option value="">Belum ditentukan</option>{leaders.map((leader) => <option key={leader.id} value={leader.id}>{leader.nama}</option>)}</select></td><td className="px-4 py-3"><Badge tone={item.active ? "success" : "neutral"}>{item.active ? "Aktif" : "Nonaktif"}</Badge></td><td className="px-4 py-3"><div className="flex gap-2"><button type="button" className={btn.outline} onClick={() => setEditing(item)}>Edit</button><button type="button" className={btn.danger} onClick={() => void remove(item)}>Hapus</button></div></td></tr>)}
+      {classes.map((item) => <tr key={item.id}><td className="px-4 py-3 font-semibold">{item.nama}</td><td className="px-4 py-3">{item.jurusan}</td><td className="px-4 py-3">{item.totalSiswa ?? "—"}</td><td className="px-4 py-3"><select aria-label={`Ketua kelas ${item.nama}`} value={item.ketuaAkunId ?? ""} onChange={(event) => void assignLeader(item.id, event.target.value)} className={field}><option value="">Belum ditentukan</option>{leaders.map((leader) => <option key={leader.id} value={leader.id}>{leader.nama}</option>)}</select></td><td className="px-4 py-3"><Badge tone={item.active ? "success" : "neutral"}>{item.active ? "Aktif" : "Nonaktif"}</Badge></td><td className="px-4 py-3"><div className="flex gap-2"><button type="button" className={btn.outline} onClick={() => setEditing(item)}>Edit</button><button type="button" className={btn.danger} onClick={() => void remove(item)}>Hapus</button></div></td></tr>)}
       {classes.length === 0 && <tr><td colSpan={6}><EmptyState title="Belum ada kelas" description="Tambahkan kelas untuk mulai mengatur data siswa." /></td></tr>}
     </tbody></table></section>
     <Dialog open={Boolean(editing)} title={editing?.id ? "Edit kelas" : "Tambah kelas"} onClose={() => setEditing(null)}><form onSubmit={save} className="mt-4 space-y-4"><label className="grid gap-2 text-sm font-medium">Nama kelas<input name="nama" required maxLength={80} defaultValue={editing?.nama} className={field} /></label><label className="grid gap-2 text-sm font-medium">Jurusan<input name="jurusan" required maxLength={80} defaultValue={editing?.jurusan} className={field} /></label><div className="flex justify-end gap-2"><button type="button" className={btn.outline} onClick={() => setEditing(null)}>Batal</button><button type="submit" className={btn.primary} disabled={busy}>{busy ? "Menyimpan…" : "Simpan"}</button></div></form></Dialog>

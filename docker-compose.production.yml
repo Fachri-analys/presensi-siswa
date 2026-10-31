@@ -5,6 +5,8 @@ services:
       context: ./backend
       target: builder
     restart: "no"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: file:/app/data/presensi.db
@@ -19,6 +21,8 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: file:/app/data/presensi.db
@@ -40,6 +44,8 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?Set PUBLIC_API_BASE_URL in .env.production}
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -59,6 +65,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
     profiles: [edge]
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN in .env.production}
@@ -83,6 +90,8 @@ services:
       context: ./backend
       target: builder
     profiles: [setup]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: file:/app/data/presensi.db

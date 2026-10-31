@@ -113,6 +113,7 @@ export interface SchoolClass {
   jurusan: string;
   ketuaAkunId: string | null;
   active: boolean;
+  totalSiswa?: number;
 }
 
 export interface SchoolTeacher {

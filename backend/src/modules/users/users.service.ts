@@ -175,6 +175,10 @@ export class UsersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (current.role === Role.ADMIN && current.status === ActiveStatus.active) {
+        await this.ensureAnotherActiveAdmin(tx, dto.role ?? current.role, dto.status ?? current.status);
+      }
+
       const user = await tx.user.update({
         where: { id },
         data,
@@ -203,11 +207,29 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    await this.prisma.user.delete({
-      where: { id },
+    const current = await this.findOne(id);
+    await this.prisma.$transaction(async (tx) => {
+      if (current.role === Role.ADMIN && current.status === ActiveStatus.active) {
+        await this.ensureAnotherActiveAdmin(tx, null, null);
+      }
+      await tx.user.delete({ where: { id } });
     });
     return { success: true };
+  }
+
+  private async ensureAnotherActiveAdmin(
+    tx: Prisma.TransactionClient,
+    nextRole: Role | null,
+    nextStatus: ActiveStatus | null,
+  ) {
+    if (nextRole === Role.ADMIN && nextStatus === ActiveStatus.active) return;
+
+    const activeAdmins = await tx.user.count({
+      where: { role: Role.ADMIN, status: ActiveStatus.active },
+    });
+    if (activeAdmins <= 1) {
+      throw new ConflictException('Tidak dapat menghilangkan Admin aktif terakhir.');
+    }
   }
 
   private async validateRoleAssignment(role: Role, kelasId: string | null, excludeUserId?: string) {
