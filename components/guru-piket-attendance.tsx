@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FilePlus } from "lucide-react";
+import { CheckCircle2, Clock, FilePlus, FileText, Info, Search, UserCheck } from "lucide-react";
 import { getLocalDateKey, getLocalTime } from "@/lib/time";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { btn, card, EmptyState, field, StatCard } from "@/components/ui";
@@ -152,11 +152,26 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         <p className="mt-1 text-sm text-muted">Pilih kelas, isi status setiap siswa, lalu simpan presensi. Guru Piket dapat mencatat status apa pun dan memberi izin Hadir di luar jadwal per siswa.</p>
       </div>
 
-      <p role="note" className="rounded-md border border-info/30 bg-info-soft px-4 py-3 text-sm text-info">
-        {ready && activeSession
-          ? `Sesi ${activeSession} sedang terbuka.`
-          : "Di luar jam atau saat sesi dikunci, Guru Piket dapat menjadi pemberi izin Hadir untuk siswa tertentu."}
-      </p>
+      <div
+        role="note"
+        className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${
+          ready && activeSession
+            ? "border-info/30 bg-info-soft text-info"
+            : "border-warning/30 bg-warning-soft text-warning"
+        }`}
+      >
+        <Info size={18} className="shrink-0 mt-0.5" aria-hidden />
+        <div>
+          <p className="font-semibold">
+            {ready && activeSession ? `Sesi ${activeSession} Sedang Terbuka` : "Di Luar Jam / Sesi Terkunci"}
+          </p>
+          <p className="text-xs opacity-90">
+            {ready && activeSession
+              ? "Siswa dapat dicatat Hadir dan Terlambat sesuai jadwal aktif sekolah."
+              : "Guru Piket berwenang memberikan izin Hadir di luar jadwal per siswa untuk dapat diakses Ketua Kelas."}
+          </p>
+        </div>
+      </div>
 
       <section aria-label="Pilih kelas dan tanggal" className={`${card} grid gap-4 p-4 sm:grid-cols-[minmax(12rem,20rem)_minmax(10rem,14rem)_1fr] sm:items-end`}>
         <label className="grid min-w-0 gap-2 text-sm font-medium">
@@ -183,17 +198,18 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         </p>
       </section>
 
-      <section aria-label="Ringkasan presensi" className="stat-grid [--stat-min:7.5rem]">
-        <StatCard label="Sudah diisi" value={done} color="success" />
-        <StatCard label="Belum diisi" value={remaining} color={remaining ? "warning" : "success"} highlight={remaining > 0} />
-        <StatCard label="Hadir" value={countStatus("HADIR")} color="success" />
-        <StatCard label="Terlambat" value={countStatus("TERLAMBAT")} color="warning" />
-        <StatCard label="Izin / Sakit / Alpa" value={countStatus("IZIN") + countStatus("SAKIT") + countStatus("ALPA")} color="info" />
+      <section aria-label="Ringkasan presensi" className="stat-grid [--stat-min:8rem]">
+        <StatCard label="Sudah diisi" value={done} color="success" icon={UserCheck} />
+        <StatCard label="Belum diisi" value={remaining} color={remaining ? "warning" : "success"} highlight={remaining > 0} icon={Clock} />
+        <StatCard label="Hadir" value={countStatus("HADIR")} color="success" icon={CheckCircle2} />
+        <StatCard label="Terlambat" value={countStatus("TERLAMBAT")} color="warning" icon={Clock} />
+        <StatCard label="Izin / Sakit / Alpa" value={countStatus("IZIN") + countStatus("SAKIT") + countStatus("ALPA")} color="info" icon={FileText} />
       </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <label className={`${field} flex flex-1 items-center gap-2`}>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS siswa" aria-label="Cari siswa dalam kelas" className="w-full bg-transparent outline-none" />
+          <Search size={16} className="text-muted shrink-0" aria-hidden />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama atau NIS siswa…" aria-label="Cari siswa dalam kelas" className="w-full bg-transparent outline-none" />
         </label>
         <button type="button" onClick={() => setSuratSakitOpen(true)} className={`${btn.outline} w-full sm:w-auto`}>
           <FilePlus size={16} aria-hidden /> Submit Surat Sakit

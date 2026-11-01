@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { STATUS_LABEL, type Status, type Tone } from "@/lib/types";
 
 const BASE_BTN = "inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-50 pointer-coarse:h-12";
@@ -32,10 +32,29 @@ export function StatusBadge({ status }: { status: Status | null }) {
 
 const VALUE_COLOR = { ink: "text-ink", success: "text-success", info: "text-info", warning: "text-warning", danger: "text-danger", muted: "text-muted" } as const;
 
-export function StatCard({ label, value, color = "ink", highlight }: { label: string; value: number; color?: keyof typeof VALUE_COLOR; highlight?: boolean }) {
+export function StatCard({ label, value, color = "ink", highlight, icon: Icon }: { label: string; value: number; color?: keyof typeof VALUE_COLOR; highlight?: boolean; icon?: LucideIcon }) {
   return (
     <div className={`${card} flex flex-col justify-between p-4 ${highlight ? "border-warning bg-warning-soft" : ""}`}>
-      <p className="text-xs font-medium text-muted">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold tracking-wide text-muted">{label}</p>
+        {Icon && (
+          <div
+            className={`grid size-8 shrink-0 place-items-center rounded-md ${
+              highlight
+                ? "bg-warning/20 text-warning"
+                : color === "success"
+                ? "bg-success-soft text-success"
+                : color === "warning"
+                ? "bg-warning-soft text-warning"
+                : color === "danger"
+                ? "bg-danger-soft text-danger"
+                : "bg-primary-soft text-primary"
+            }`}
+          >
+            <Icon size={18} aria-hidden />
+          </div>
+        )}
+      </div>
       <p className={`mt-2 text-[2rem] font-semibold leading-10 tabular-nums tracking-tight ${VALUE_COLOR[color]}`}>{value}</p>
     </div>
   );

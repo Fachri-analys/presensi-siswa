@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 import type { SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { useRole } from "@/components/app-shell";
 import { createApiSchoolRepository } from "@/lib/data/api-school";
@@ -10,7 +10,7 @@ import { Dialog } from "./dialog";
 import { Badge, btn, card, EmptyState, field, Pagination } from "./ui";
 
 const PAGE_SIZE = 10;
-const CELL = "px-4 py-3";
+const CELL = "px-3 py-3 xl:px-4";
 type StudentStatus = "active" | "inactive";
 type ManagedStudent = SchoolStudent;
 type PendingAction = { kind: "deactivate" | "activate" | "delete"; student: ManagedStudent } | null;
@@ -86,6 +86,8 @@ export function GuruPiketStudents({
   }, [toast]);
 
   const visible = students;
+
+  const isFiltered = query.trim() !== "" || classFilter !== "all" || (isAdmin && statusFilter !== "all");
 
   async function completeAction() {
     if (!pending) return;
@@ -187,86 +189,177 @@ export function GuruPiketStudents({
   const statusDialog = pending?.kind === "deactivate" || pending?.kind === "activate";
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">{fixedClassId ? `Siswa ${getClassName(classes, fixedClassId)}` : "Data Siswa"}</h1>
-        <p className="mt-1 text-sm text-muted">
-          {isAdmin
-            ? "Admin dapat mengelola data siswa di semua kelas."
-            : fixedClassId
-              ? "Daftar siswa kelas Anda. Pengelolaan siswa hanya dilakukan oleh Admin."
-              : "Daftar siswa aktif di semua kelas. Pengelolaan siswa hanya dilakukan oleh Admin."}
-        </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+            {fixedClassId ? `Siswa ${getClassName(classes, fixedClassId)}` : "Data Siswa"}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            {isAdmin
+              ? "Admin dapat mengelola data siswa di semua kelas."
+              : fixedClassId
+                ? "Daftar siswa kelas Anda. Pengelolaan siswa hanya dilakukan oleh Admin."
+                : "Daftar siswa aktif di semua kelas. Pengelolaan siswa hanya dilakukan oleh Admin."}
+          </p>
+        </div>
+        {isAdmin && (
+          <button type="button" onClick={() => { setEditing(null); setFormError(null); setShowForm(true); }} className={btn.accent}>
+            <Plus size={16} aria-hidden /> Tambah siswa
+          </button>
+        )}
       </div>
 
-      <section aria-label="Filter daftar siswa" className={`${card} grid gap-3 p-4 ${fixedClassId ? "md:grid-cols-[1fr]" : isAdmin ? "md:grid-cols-[1fr_12rem_12rem]" : "md:grid-cols-[1fr_12rem]"}`}>
-        <label className={`${field} flex items-center gap-2`}>
-          <Search size={16} className="text-muted" aria-hidden />
-          <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Cari nama atau NIS siswa" aria-label="Cari nama atau NIS siswa" className="w-full bg-transparent outline-none" />
-        </label>
-        {!fixedClassId && <label className="grid gap-1 text-xs font-medium text-muted">
-            Kelas
-            <select value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1); }} className={field}>
-              <option value="all">Semua kelas</option>
-              {classes.filter((item) => item.active || item.id === editing?.kelasId).map((item) => <option key={item.id} value={item.id}>{item.nama}{item.active ? "" : " (nonaktif)"}</option>)}
-            </select>
-          </label>}
-        {isAdmin && <label className="grid gap-1 text-xs font-medium text-muted">
-            Status akun
-            <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "all" | StudentStatus); setPage(1); }} className={field}>
-              <option value="all">Semua status</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Nonaktif</option>
-            </select>
-          </label>}
+      {/* Search & Filter Controls — consistent card layout */}
+      <section aria-label="Filter daftar siswa" className={`${card} p-3.5 sm:p-4`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <label className={`${field} flex flex-1 items-center gap-2 bg-canvas/70`}>
+            <Search size={16} className="text-muted shrink-0" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => { setQuery(event.target.value); setPage(1); }}
+              placeholder="Cari nama atau NIS siswa…"
+              aria-label="Cari nama atau NIS siswa"
+              className="w-full bg-transparent outline-none"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            {!fixedClassId && (
+              <select
+                aria-label="Filter kelas"
+                value={classFilter}
+                onChange={(event) => { setClassFilter(event.target.value); setPage(1); }}
+                className={`${field} bg-canvas/70 min-w-36`}
+              >
+                <option value="all">Semua kelas</option>
+                {classes.filter((item) => item.active || item.id === editing?.kelasId).map((item) => (
+                  <option key={item.id} value={item.id}>{item.nama}{item.active ? "" : " (nonaktif)"}</option>
+                ))}
+              </select>
+            )}
+            {isAdmin && (
+              <select
+                aria-label="Filter status akun"
+                value={statusFilter}
+                onChange={(event) => { setStatusFilter(event.target.value as "all" | StudentStatus); setPage(1); }}
+                className={`${field} bg-canvas/70 min-w-36`}
+              >
+                <option value="all">Semua status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+              </select>
+            )}
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={() => { setQuery(""); setClassFilter("all"); setStatusFilter("all"); setPage(1); }}
+                className="inline-flex h-10 items-center gap-1 rounded-md px-3 text-xs font-semibold text-danger hover:bg-danger-soft transition-colors pointer-coarse:h-12"
+              >
+                <X size={14} aria-hidden />
+                <span>Reset filter</span>
+              </button>
+            )}
+          </div>
+        </div>
       </section>
 
-      {isAdmin && (
-        <button type="button" onClick={() => { setEditing(null); setFormError(null); setShowForm(true); }} className={btn.accent}>
-          <Plus size={16} aria-hidden /> Tambah siswa
-        </button>
-      )}
-
-      <div className={`${card} overflow-hidden`}>
+      {/* Data Table */}
+      <section aria-label="Tabel daftar siswa" className={`${card} overflow-hidden`}>
         {visible.length === 0 ? (
           <EmptyState title="Siswa tidak ditemukan" description="Coba periksa kembali kata kunci, kelas, atau status yang dipilih." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-240 text-sm">
-              <thead>
-                <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
-                  {["NIS", "Nama", "Kelas", ...(isAdmin ? ["Status akun"] : [])].map((heading) => <th key={heading} scope="col" className={CELL}>{heading}</th>)}
-                  {isAdmin && <th scope="col" className={CELL}>Tindakan</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {visible.map((student) => (
-                  <tr key={student.id} className="hover:bg-canvas">
-                    <td className={`${CELL} tabular-nums`}>{student.nis}</td>
-                    <td className={`${CELL} font-semibold`}>{student.nama}</td>
-                    <td className={CELL}>{getClassName(classes, student.kelasId)}</td>
-                    {isAdmin && <td className={CELL}><Badge tone={student.status === "active" ? "success" : "neutral"}>{student.status === "active" ? "Aktif" : "Nonaktif"}</Badge></td>}
-                    {isAdmin && <td className={CELL}>
-                      <div className="flex flex-wrap gap-1">
-                        <button type="button" onClick={() => { setEditing(student); setFormError(null); setShowForm(true); }} className={`${btn.outline} h-9 px-3 text-xs`}>
-                          <Pencil size={14} aria-hidden /> Edit
-                        </button>
-                        <button type="button" onClick={() => setPending({ kind: student.status === "active" ? "deactivate" : "activate", student })} className={`${btn.outline} h-9 px-3 text-xs`}>
-                            {student.status === "active" ? <><ShieldOff size={14} aria-hidden /> Nonaktifkan</> : <><ShieldCheck size={14} aria-hidden /> Aktifkan</>}
-                        </button>
-                        <button type="button" aria-label={`Hapus ${student.nama}`} onClick={() => setPending({ kind: "delete", student })} className="grid size-9 place-items-center rounded-md text-danger hover:bg-danger-soft" title="Hapus data">
-                          <Trash2 size={16} aria-hidden />
-                        </button>
-                      </div>
-                    </td>}
+          <>
+            {/* Mobile list view */}
+            <ul className="divide-y divide-line md:hidden">
+              {visible.map((student) => (
+                <li key={student.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">{student.nama}</p>
+                    <p className="text-xs text-muted">NIS {student.nis} · {getClassName(classes, student.kelasId)}</p>
+                  </div>
+                  {isAdmin && (
+                    <Badge tone={student.status === "active" ? "success" : "neutral"}>
+                      {student.status === "active" ? "Aktif" : "Nonaktif"}
+                    </Badge>
+                  )}
+                  {isAdmin && (
+                    <div className="flex shrink-0 gap-1">
+                      <button type="button" aria-label={`Edit ${student.nama}`} onClick={() => { setEditing(student); setFormError(null); setShowForm(true); }} className="grid size-9 place-items-center rounded-md text-muted hover:bg-primary-soft">
+                        <Pencil size={16} />
+                      </button>
+                      <button type="button" aria-label={`Hapus ${student.nama}`} onClick={() => setPending({ kind: "delete", student })} className="grid size-9 place-items-center rounded-md text-danger hover:bg-danger-soft">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-160 text-sm">
+                <thead>
+                  <tr className="bg-primary-soft text-left text-xs font-semibold text-muted">
+                    <th scope="col" className={CELL}>NIS</th>
+                    <th scope="col" className={CELL}>Nama</th>
+                    <th scope="col" className={CELL}>Kelas</th>
+                    {isAdmin && <th scope="col" className={CELL}>Status akun</th>}
+                    {isAdmin && <th scope="col" className={`${CELL} text-right`}>Tindakan</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {visible.map((student) => (
+                    <tr key={student.id} className="hover:bg-canvas/50 transition-colors">
+                      <td className={`${CELL} tabular-nums text-muted`}>{student.nis}</td>
+                      <td className={`${CELL} font-semibold text-ink`}>{student.nama}</td>
+                      <td className={CELL}>{getClassName(classes, student.kelasId)}</td>
+                      {isAdmin && (
+                        <td className={CELL}>
+                          <Badge tone={student.status === "active" ? "success" : "neutral"}>
+                            {student.status === "active" ? "Aktif" : "Nonaktif"}
+                          </Badge>
+                        </td>
+                      )}
+                      {isAdmin && (
+                        <td className={`${CELL} text-right`}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => { setEditing(student); setFormError(null); setShowForm(true); }}
+                              className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary hover:text-white transition-colors"
+                            >
+                              <Pencil size={13} aria-hidden /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPending({ kind: student.status === "active" ? "deactivate" : "activate", student })}
+                              className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted hover:bg-canvas hover:text-ink transition-colors"
+                            >
+                              {student.status === "active" ? <><ShieldOff size={13} aria-hidden /> Nonaktifkan</> : <><ShieldCheck size={13} aria-hidden /> Aktifkan</>}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Hapus ${student.nama}`}
+                              onClick={() => setPending({ kind: "delete", student })}
+                              className="grid size-8 place-items-center rounded-md text-danger hover:bg-danger-soft transition-colors"
+                              title="Hapus data"
+                            >
+                              <Trash2 size={15} aria-hidden />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} total={total} unit="siswa" onChange={setPage} />}
-      </div>
+      </section>
 
       {isAdmin && <Dialog open={Boolean(statusDialog)} title={pending?.kind === "deactivate" ? "Nonaktifkan data siswa?" : "Aktifkan kembali data siswa?"} onClose={() => setPending(null)}>
         <p className="mt-2 text-sm text-muted">
@@ -274,7 +367,7 @@ export function GuruPiketStudents({
             ? <><strong>{pending.student.nama}</strong> tidak akan muncul pada daftar presensi aktif sampai datanya diaktifkan kembali.</>
             : <><strong>{pending?.student.nama}</strong> akan muncul kembali pada daftar presensi aktif.</>}
         </p>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2 pt-2 border-t border-line">
           <button type="button" onClick={() => setPending(null)} className={btn.outline}>Batal</button>
           <button type="button" onClick={completeAction} className={btn.primary}>Ya, lanjutkan</button>
         </div>
@@ -282,7 +375,7 @@ export function GuruPiketStudents({
 
       {isAdmin && <Dialog open={Boolean(deleteDialog)} title="Hapus data siswa?" onClose={() => setPending(null)}>
         <p className="mt-2 text-sm text-muted">Data <strong>{pending?.student.nama}</strong> akan dihapus dari backend.</p>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2 pt-2 border-t border-line">
           <button type="button" onClick={() => setPending(null)} className={btn.outline}>Batal</button>
           <button type="button" onClick={completeAction} className={btn.danger}>Hapus data</button>
         </div>
@@ -306,14 +399,14 @@ export function GuruPiketStudents({
             </select>
           </label>}
           {formError && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{formError}</p>}
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-line">
             <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className={btn.outline}>Batal</button>
             <button type="submit" className={btn.primary}>Simpan</button>
           </div>
         </form>
       </Dialog>}
 
-      {toast && <div role="status" className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white">{toast}</div>}
+      {toast && <div role="status" className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-lg">{toast}</div>}
     </div>
   );
 }

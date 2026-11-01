@@ -212,23 +212,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 bg-primary px-4 text-white print:hidden md:px-6 lg:h-18 lg:border-b lg:border-line lg:bg-surface lg:text-ink xl:px-8">
-          <button
-            type="button"
-            aria-label="Buka menu"
-            aria-controls="main-navigation"
-            aria-expanded={open}
-            className="shrink-0 rounded-md p-2 text-white hover:bg-white/10 lg:text-ink lg:hover:bg-primary-soft"
-            onClick={() => setOpen(true)}
-          >
-            <Menu size={24} />
-          </button>
-          <div className="text-center lg:text-left">
-            <p className="text-base font-semibold lg:hidden">SMK Negeri 11 Jakarta</p>
-            <p className="text-xs text-sky lg:hidden">Sistem Presensi Siswa</p>
-            <p className="hidden text-xl font-semibold lg:block">{current?.label ?? "Sistem Presensi Siswa"}</p>
-            <p suppressHydrationWarning className="hidden text-sm text-muted lg:block">{today}</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Buka menu"
+              aria-controls="main-navigation"
+              aria-expanded={open}
+              className="shrink-0 rounded-md p-2 text-white hover:bg-white/10 lg:text-ink lg:hover:bg-primary-soft"
+              onClick={() => setOpen(true)}
+            >
+              <Menu size={24} />
+            </button>
+            <div className="text-left">
+              <p className="text-base font-semibold lg:hidden">SMK Negeri 11 Jakarta</p>
+              <p className="text-xs text-sky lg:hidden">Sistem Presensi Siswa</p>
+              <p className="hidden text-xl font-semibold lg:block">{current?.label ?? "Sistem Presensi Siswa"}</p>
+              <p suppressHydrationWarning className="hidden text-sm text-muted lg:block">{today}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
             <div className="hidden size-10 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary sm:grid">
               {sessionUser?.nama ? sessionUser.nama.slice(0, 2).toUpperCase() : ROLES[role].initials}
             </div>

@@ -2,13 +2,30 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Eye, FilePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  FilePlus,
+  FileText,
+  HeartPulse,
+  Info,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  UserCheck,
+  Users,
+  UserX,
+  X,
+} from "lucide-react";
 import { getLocalDateKey, getLocalTime } from "@/lib/time";
 import { useRole } from "./app-shell";
 import { STATUS_LABEL, type Status, type Student } from "@/lib/types";
 import { Dialog } from "./dialog";
 import { StudentTable } from "./student-table";
-import { btn, field, StatCard, StatusBadge } from "./ui";
+import { btn, card, field, StatCard, StatusBadge } from "./ui";
 import { useAttendanceWindow } from "./use-attendance-window";
 import { createApiAttendanceRepository } from "@/lib/data/api-attendance";
 import { apiErrorMessage } from "@/lib/data/api-client";
@@ -23,7 +40,19 @@ type DialogState = { kind: "form" | "detail" | "delete"; nis?: string } | null;
 
 const isStatus = (value: string): value is Status => Object.hasOwn(STATUS_LABEL, value);
 
-function IconButton({ label, onClick, danger, disabled, children }: { label: string; onClick: () => void; danger?: boolean; disabled?: boolean; children: ReactNode }) {
+function IconButton({
+  label,
+  onClick,
+  danger,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -31,7 +60,9 @@ function IconButton({ label, onClick, danger, disabled, children }: { label: str
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`grid size-10 pointer-coarse:size-12 place-items-center rounded-md hover:bg-primary-soft disabled:opacity-30 ${danger ? "text-danger" : "text-muted hover:text-ink"}`}
+      className={`grid size-10 pointer-coarse:size-12 place-items-center rounded-md hover:bg-primary-soft disabled:opacity-30 transition-colors ${
+        danger ? "text-danger hover:bg-danger-soft" : "text-muted hover:text-ink"
+      }`}
     >
       {children}
     </button>
@@ -67,13 +98,23 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
     }
     await onSubmit(nis, value, String(data.get("keterangan") ?? "").trim());
   }
+
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
       <label className="grid gap-2 text-sm font-medium">
         Siswa
-        <select name="nis" defaultValue={target?.nis ?? ""} onChange={(event) => setSelectedNis(event.target.value)} className={field}>
+        <select
+          name="nis"
+          defaultValue={target?.nis ?? ""}
+          onChange={(event) => setSelectedNis(event.target.value)}
+          className={field}
+        >
           {!target && <option value="" disabled>Pilih siswa</option>}
-          {(target ? [target] : options).map((s) => <option key={s.nis} value={s.nis}>{s.nama} ({s.nis})</option>)}
+          {(target ? [target] : options).map((s) => (
+            <option key={s.nis} value={s.nis}>
+              {s.nama} ({s.nis})
+            </option>
+          ))}
         </select>
       </label>
       {formError && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{formError}</p>}
@@ -82,16 +123,23 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
         <select name="status" defaultValue={target?.status ?? ""} className={field}>
           <option value="" disabled>Pilih status</option>
           {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-            <option key={s} value={s} disabled={PRESENT.includes(s) && !presentAllowed}>{STATUS_LABEL[s]}</option>
+            <option key={s} value={s} disabled={PRESENT.includes(s) && !presentAllowed}>
+              {STATUS_LABEL[s]}
+            </option>
           ))}
         </select>
       </label>
-      {!presentAllowed && <p className="text-xs text-warning">Di luar jadwal atau sesi sedang dikunci: hanya Izin, Sakit, dan Alpa yang bisa dipilih tanpa izin Guru Piket.</p>}
+      {!presentAllowed && (
+        <div className="flex items-start gap-2 rounded-md bg-warning-soft p-3 text-xs text-warning">
+          <Info size={14} className="shrink-0 mt-0.5" aria-hidden />
+          <span>Di luar jadwal atau sesi sedang dikunci: hanya status Izin, Sakit, dan Alpa yang dapat dipilih langsung tanpa izin Guru Piket.</span>
+        </div>
+      )}
       <label className="grid gap-2 text-sm font-medium">
         Keterangan
-        <input name="keterangan" maxLength={120} defaultValue={target?.keterangan} placeholder="Opsional" className={field} />
+        <input name="keterangan" maxLength={120} defaultValue={target?.keterangan} placeholder="Opsional (misal: sakit demam, izin lomba)" className={field} />
       </label>
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className={btn.outline}>Batal</button>
         <button type="submit" className={btn.primary}>Simpan presensi</button>
       </div>
@@ -109,27 +157,45 @@ export function KetuaKelasDashboard() {
   const ketuaName = user?.nama ?? "Ketua Kelas";
   const [date] = useState(getLocalDateKey);
   const { activeSession, ready } = useAttendanceWindow();
+
   const refresh = useCallback(async () => {
-    const school = createApiSchoolRepository(); const attendance = createApiAttendanceRepository();
-    if (!school || !attendance || !kelasId) { setLoadingError("Backend belum dikonfigurasi atau akun belum memiliki kelas."); return; }
+    const school = createApiSchoolRepository();
+    const attendance = createApiAttendanceRepository();
+    if (!school || !attendance || !kelasId) {
+      setLoadingError("Backend belum dikonfigurasi atau akun belum memiliki kelas.");
+      return;
+    }
     try {
-      const [classItem, studentsPage, saved] = await Promise.all([school.getClass(kelasId), school.listStudents({ kelasId, status: "active", limit: 100 }), attendance.listClassAttendance(kelasId, date)]);
-      setKelas(classItem); setRoster(studentsPage.items); setRecords(saved); setLoadingError(null);
-    } catch (err: unknown) { setLoadingError(apiErrorMessage(err)); }
+      const [classItem, studentsPage, saved] = await Promise.all([
+        school.getClass(kelasId),
+        school.listStudents({ kelasId, status: "active", limit: 100 }),
+        attendance.listClassAttendance(kelasId, date),
+      ]);
+      setKelas(classItem);
+      setRoster(studentsPage.items);
+      setRecords(saved);
+      setLoadingError(null);
+    } catch (err: unknown) {
+      setLoadingError(apiErrorMessage(err));
+    }
   }, [kelasId, date]);
-  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
+
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+  }, [refresh]);
+
   const savedAttendance = Object.fromEntries(records.map((record) => [record.nis, record]));
-  const students: Student[] = roster
-    .map((student) => {
-      const saved = savedAttendance[student.nis];
-      return {
-        nis: student.nis,
-        nama: student.nama,
-        status: saved?.status ?? null,
-        waktu: saved?.waktu ?? null,
-        keterangan: saved?.keterangan ?? "",
-      };
-    });
+  const students: Student[] = roster.map((student) => {
+    const saved = savedAttendance[student.nis];
+    return {
+      nis: student.nis,
+      nama: student.nama,
+      status: saved?.status ?? null,
+      waktu: saved?.waktu ?? null,
+      keterangan: saved?.keterangan ?? "",
+    };
+  });
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "BELUM" | "">("");
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -156,10 +222,16 @@ export function KetuaKelasDashboard() {
     const previous = savedAttendance[nis];
     const waktu = PRESENT.includes(status) ? (previous?.waktu ?? getLocalTime()) : null;
     const attendanceRepo = createApiAttendanceRepository();
-    if (!attendanceRepo) { setToast("Backend belum dikonfigurasi."); return; }
+    if (!attendanceRepo) {
+      setToast("Backend belum dikonfigurasi.");
+      return;
+    }
     try {
-      if (previous?.id) await attendanceRepo.updateAttendance(previous.id, { status, waktu, keterangan });
-      else await attendanceRepo.saveClassAttendance({ date, kelasId, records: [{ nis, status, waktu, keterangan }] });
+      if (previous?.id) {
+        await attendanceRepo.updateAttendance(previous.id, { status, waktu, keterangan });
+      } else {
+        await attendanceRepo.saveClassAttendance({ date, kelasId, records: [{ nis, status, waktu, keterangan }] });
+      }
     } catch (err: unknown) {
       setToast(`Gagal menyimpan presensi ke server: ${apiErrorMessage(err)}`);
       return;
@@ -167,13 +239,16 @@ export function KetuaKelasDashboard() {
 
     await refresh();
     close();
-    setToast("Presensi disimpan");
+    setToast("Presensi berhasil disimpan.");
   }
 
   async function remove(nis: string) {
     const attendanceRepo = createApiAttendanceRepository();
     const attendanceRecord = savedAttendance[nis];
-    if (!attendanceRepo || !attendanceRecord) { setToast("Presensi tidak ditemukan di backend."); return; }
+    if (!attendanceRepo || !attendanceRecord) {
+      setToast("Presensi tidak ditemukan di backend.");
+      return;
+    }
     try {
       await attendanceRepo.deleteAttendance(attendanceRecord.id);
     } catch (err: unknown) {
@@ -183,78 +258,197 @@ export function KetuaKelasDashboard() {
 
     await refresh();
     close();
-    setToast("Presensi dihapus");
+    setToast("Presensi berhasil dihapus.");
   }
 
   const actionButtons = (
-    <>
-      <button type="button" onClick={() => setSuratSakitOpen(true)} className={`${btn.outline} px-2.5 sm:px-4 text-xs sm:text-sm`}>
-        <FilePlus size={16} aria-hidden /> Surat Sakit
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setSuratSakitOpen(true)}
+        className={`${btn.outline} px-3 sm:px-4 text-xs sm:text-sm`}
+      >
+        <FilePlus size={16} aria-hidden />
+        <span>Surat Sakit</span>
       </button>
-      <Link href="/laporan" className={`${btn.outline} px-2.5 sm:px-4 text-xs sm:text-sm`}>
-        Laporan
+      <Link
+        href="/laporan"
+        className={`${btn.outline} px-3 sm:px-4 text-xs sm:text-sm`}
+      >
+        <FileText size={16} aria-hidden />
+        <span>Laporan</span>
       </Link>
-      <button type="button" onClick={() => setDialog({ kind: "form" })} className={`${btn.accent} flex-1 lg:flex-none px-3 sm:px-4 text-xs sm:text-sm`}>
-        <Plus size={16} aria-hidden /> Tambah presensi
+      <button
+        type="button"
+        onClick={() => setDialog({ kind: "form" })}
+        className={`${btn.accent} flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm`}
+      >
+        <Plus size={16} aria-hidden />
+        <span>Catat Presensi</span>
       </button>
-    </>
+    </div>
   );
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
-      {loadingError && <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">Gagal memuat kelas: {loadingError}</p>}
-      <div className="flex items-end justify-between gap-4">
+    <div className="space-y-6 pb-20 lg:pb-0">
+      {loadingError && (
+        <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">
+          Gagal memuat kelas: {loadingError}
+        </p>
+      )}
+
+      {/* Header Section */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Presensi Kelas {kelas?.nama}</h1>
-          <p className="text-sm text-muted">Ketua Kelas: {ketuaName} · Kelola presensi dan surat sakit harian</p>
-        </div>
-        <div className="hidden gap-2 lg:flex">{actionButtons}</div>
-      </div>
-
-      <p role="note" className={`rounded-md border px-4 py-3 text-sm ${activeSession ? "border-success/30 bg-success-soft text-success" : "border-warning/30 bg-warning-soft text-warning"}`}>
-        {!ready
-          ? "Memeriksa jadwal presensi..."
-          : activeSession
-            ? `Sesi ${activeSession} terbuka. Hadir dan Terlambat dapat dicatat.`
-            : "Di luar jam presensi atau sesi dikunci. Status Hadir/Terlambat memerlukan izin Guru Piket; Izin, Sakit, dan Alpa tetap dapat dicatat."}
-      </p>
-
-      <div className="stat-grid [--stat-min:6rem]">
-        <StatCard label="Jumlah Siswa" value={students.length} />
-        <StatCard label="Hadir" value={count(...PRESENT)} color="success" />
-        <StatCard label="Terlambat" value={count("TERLAMBAT")} color="warning" />
-        <StatCard label="Izin" value={count("IZIN")} color="info" />
-        <StatCard label="Sakit" value={count("SAKIT")} color="warning" />
-        <StatCard label="Alpa" value={count("ALPA")} color="danger" />
-      </div>
-      <p className="text-xs text-muted">Jumlah Hadir sudah termasuk siswa yang terlambat; angka terlambat ditampilkan terpisah sebagai rincian.</p>
-
-      <div className="flex gap-2">
-        <label className={`${field} flex flex-1 items-center gap-2`}>
-          <Search size={16} className="text-muted" aria-hidden />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari nama atau NIS siswa" aria-label="Cari siswa" className="w-full bg-transparent outline-none" />
-        </label>
-        <select aria-label="Filter status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as Status | "BELUM" | "")} className={field}>
-          <option value="">Semua status</option>
-          {(Object.keys(STATUS_LABEL) as Status[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-          <option value="BELUM">Belum presensi</option>
-        </select>
-      </div>
-
-      <StudentTable
-        students={visible}
-        actions={(s) => (
-          <div className="flex">
-            <IconButton label={`Detail presensi ${s.nama}`} onClick={() => setDialog({ kind: "detail", nis: s.nis })}><Eye size={18} /></IconButton>
-            <IconButton label={`Edit presensi ${s.nama}`} onClick={() => setDialog({ kind: "form", nis: s.nis })}><Pencil size={18} /></IconButton>
-            <IconButton label={`Hapus presensi ${s.nama}`} danger disabled={!s.status} onClick={() => setDialog({ kind: "delete", nis: s.nis })}><Trash2 size={18} /></IconButton>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent-ink">
+              Ketua Kelas
+            </span>
+            <span className="text-xs text-muted">Penanggung Jawab: {ketuaName}</span>
           </div>
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-ink">
+            Presensi Kelas {kelas?.nama ?? "…"}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            {kelas?.jurusan ? `${kelas.jurusan} · ` : ""}Catat dan kelola presensi harian serta dokumen surat sakit kelas Anda.
+          </p>
+        </div>
+        <div className="hidden sm:flex sm:items-center">{actionButtons}</div>
+      </div>
+
+      {/* Schedule / Window Status Banner */}
+      <div
+        role="note"
+        className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${
+          activeSession
+            ? "border-success/30 bg-success-soft text-success"
+            : "border-warning/30 bg-warning-soft text-warning"
+        }`}
+      >
+        {!ready ? (
+          <>
+            <Clock size={18} className="shrink-0 mt-0.5" aria-hidden />
+            <div>
+              <p className="font-semibold">Memeriksa jadwal presensi…</p>
+              <p className="text-xs opacity-85">Menghubungkan ke konfigurasi jam presensi sekolah.</p>
+            </div>
+          </>
+        ) : activeSession ? (
+          <>
+            <CheckCircle2 size={18} className="shrink-0 mt-0.5" aria-hidden />
+            <div>
+              <p className="font-semibold">Sesi {activeSession} Sedang Terbuka</p>
+              <p className="text-xs opacity-90">
+                Jadwal presensi aktif. Status <strong>Hadir</strong> dan <strong>Terlambat</strong> dapat dicatat langsung untuk siswa.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <AlertCircle size={18} className="shrink-0 mt-0.5" aria-hidden />
+            <div>
+              <p className="font-semibold">Di Luar Jadwal Presensi / Sesi Terkunci</p>
+              <p className="text-xs opacity-90">
+                Pencatatan status <strong>Hadir/Terlambat</strong> di luar jadwal memerlukan izin Guru Piket. Status <strong>Izin</strong>, <strong>Sakit</strong>, dan <strong>Alpa</strong> tetap dapat dicatat langsung.
+              </p>
+            </div>
+          </>
         )}
-      />
+      </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-line bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden">{actionButtons}</div>
+      {/* KPI Stat Cards with Icons */}
+      <section aria-label="Statistik kehadiran kelas" className="space-y-3">
+        <div className="stat-grid [--stat-min:8.5rem]">
+          <StatCard label="Jumlah Siswa" value={students.length} icon={Users} />
+          <StatCard label="Hadir" value={count(...PRESENT)} color="success" icon={UserCheck} />
+          <StatCard label="Terlambat" value={count("TERLAMBAT")} color="warning" icon={Clock} />
+          <StatCard label="Izin" value={count("IZIN")} color="info" icon={FileText} />
+          <StatCard label="Sakit" value={count("SAKIT")} color="warning" icon={HeartPulse} />
+          <StatCard label="Alpa" value={count("ALPA")} color="danger" icon={UserX} />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <Info size={14} className="shrink-0 text-muted" aria-hidden />
+          <span>Jumlah Hadir mencakup siswa tepat waktu dan terlambat; angka Terlambat dicantumkan sebagai rincian.</span>
+        </div>
+      </section>
 
-      <Dialog open={dialog?.kind === "form"} title={target ? "Edit presensi" : "Tambah presensi"} onClose={close}>
+      {/* Filter and Search Bar */}
+      <section aria-label="Filter dan pencarian siswa" className={`${card} p-3.5 sm:p-4`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className={`${field} flex flex-1 items-center gap-2 bg-canvas/70`}>
+            <Search size={16} className="text-muted shrink-0" aria-hidden />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari nama atau NIS siswa…"
+              aria-label="Cari siswa"
+              className="w-full bg-transparent outline-none"
+            />
+          </label>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Filter status presensi"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as Status | "BELUM" | "")}
+              className={`${field} bg-canvas/70 min-w-40`}
+            >
+              <option value="">Semua status</option>
+              {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </option>
+              ))}
+              <option value="BELUM">Belum presensi</option>
+            </select>
+            {(query || statusFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setStatusFilter("");
+                }}
+                className="inline-flex h-10 items-center gap-1 rounded-md px-3 text-xs font-semibold text-danger hover:bg-danger-soft transition-colors pointer-coarse:h-12"
+              >
+                <X size={14} aria-hidden />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Students Attendance Table */}
+      <section aria-label="Daftar kehadiran siswa kelas">
+        <StudentTable
+          students={visible}
+          actions={(s) => (
+            <div className="flex items-center gap-0.5">
+              <IconButton label={`Detail presensi ${s.nama}`} onClick={() => setDialog({ kind: "detail", nis: s.nis })}>
+                <Eye size={17} />
+              </IconButton>
+              <IconButton label={`Edit presensi ${s.nama}`} onClick={() => setDialog({ kind: "form", nis: s.nis })}>
+                <Pencil size={17} />
+              </IconButton>
+              <IconButton
+                label={`Hapus presensi ${s.nama}`}
+                danger
+                disabled={!s.status}
+                onClick={() => setDialog({ kind: "delete", nis: s.nis })}
+              >
+                <Trash2 size={17} />
+              </IconButton>
+            </div>
+          )}
+        />
+      </section>
+
+      {/* Floating Action Bar for Mobile */}
+      <div className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-line bg-surface/95 backdrop-blur-md p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:hidden">
+        {actionButtons}
+      </div>
+
+      {/* Modals & Dialogs */}
+      <Dialog open={dialog?.kind === "form"} title={target ? "Edit presensi siswa" : "Tambah presensi siswa"} onClose={close}>
         <PresensiForm
           options={students}
           target={target}
@@ -264,35 +458,44 @@ export function KetuaKelasDashboard() {
         />
       </Dialog>
 
-      <Dialog open={dialog?.kind === "detail"} title="Detail presensi" onClose={close}>
+      <Dialog open={dialog?.kind === "detail"} title="Detail presensi siswa" onClose={close}>
         {target && (
-          <>
-            <dl className="mt-4 grid grid-cols-[7rem_1fr] gap-y-2 text-sm">
-              <dt className="text-muted">Nama</dt><dd className="font-semibold">{target.nama}</dd>
-              <dt className="text-muted">NIS</dt><dd>{target.nis}</dd>
-              <dt className="text-muted">Status</dt><dd><StatusBadge status={target.status} /></dd>
-              <dt className="text-muted">Waktu</dt><dd>{target.waktu ? `${target.waktu} WIB` : "—"}</dd>
-              <dt className="text-muted">Keterangan</dt><dd>{target.keterangan || "—"}</dd>
+          <div className="mt-4 space-y-4">
+            <dl className="grid grid-cols-[7.5rem_1fr] gap-y-2.5 text-sm">
+              <dt className="text-muted">Nama Siswa</dt>
+              <dd className="font-semibold text-ink">{target.nama}</dd>
+              <dt className="text-muted">NIS</dt>
+              <dd className="tabular-nums font-mono text-ink">{target.nis}</dd>
+              <dt className="text-muted">Status</dt>
+              <dd><StatusBadge status={target.status} /></dd>
+              <dt className="text-muted">Waktu Presensi</dt>
+              <dd className="tabular-nums">{target.waktu ? `${target.waktu} WIB` : "—"}</dd>
+              <dt className="text-muted">Keterangan</dt>
+              <dd className="text-ink">{target.keterangan || "—"}</dd>
             </dl>
-            <div className="mt-5 flex justify-end"><button type="button" onClick={close} className={btn.outline}>Tutup</button></div>
-          </>
+            <div className="flex justify-end pt-2 border-t border-line">
+              <button type="button" onClick={close} className={btn.outline}>Tutup</button>
+            </div>
+          </div>
         )}
       </Dialog>
 
-      <Dialog open={dialog?.kind === "delete"} title="Hapus presensi?" onClose={close}>
+      <Dialog open={dialog?.kind === "delete"} title="Hapus catatan presensi?" onClose={close}>
         {target && (
-          <>
-            <p className="mt-2 text-sm text-muted">Presensi {target.nama} akan dihapus dan statusnya kembali menjadi belum presensi.</p>
-            <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-3 space-y-4">
+            <p className="text-sm text-muted">
+              Catatan presensi untuk <strong>{target.nama}</strong> (NIS {target.nis}) akan dihapus dan status siswa kembali menjadi <em>belum presensi</em>.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-line">
               <button type="button" onClick={close} className={btn.outline}>Batal</button>
               <button type="button" onClick={() => remove(target.nis)} className={btn.danger}>Hapus presensi</button>
             </div>
-          </>
+          </div>
         )}
       </Dialog>
 
       {toast && (
-        <div role="status" className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white lg:bottom-8">
+        <div role="status" className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-lg lg:bottom-8">
           {toast}
         </div>
       )}
