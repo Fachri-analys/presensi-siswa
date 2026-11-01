@@ -9,6 +9,10 @@ Web app untuk mencatat presensi siswa dan membantu sekolah melihat rekap kehadir
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma%206-2D3748?logo=prisma)](https://www.prisma.io/)
 
+## Tampilan
+
+![Halaman login Sistem Presensi Siswa](./docs/screenshot-login.png)
+
 ## Fitur dan akses pengguna
 
 | Peran | Akses utama |
