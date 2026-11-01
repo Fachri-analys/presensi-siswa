@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { BatikBetawi } from "@/components/BatikBetawi";
 import { Logo } from "@/components/logo";
 import { btn, field } from "@/components/ui";
 import { createApiAuthRepository } from "@/lib/data/api-auth";
@@ -65,17 +66,21 @@ export default function LoginPage() {
 
   return (
     <main className="page-enter grid min-h-screen lg:grid-cols-[minmax(22rem,5fr)_7fr]">
-      <section className="hidden flex-col justify-between bg-primary p-10 lg:flex xl:p-16">
-        <div className="space-y-6">
-          <Logo size={88} />
-          <div className="space-y-2">
-            <p className="text-[2rem] font-semibold leading-tight text-white">SMK Negeri 11 Jakarta</p>
-            <p className="text-lg text-sky">Sistem Presensi Siswa</p>
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 lg:flex xl:p-16">
+        <BatikBetawi />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{background:"linear-gradient(180deg,rgba(10,50,95,0),rgba(10,50,95,.88))"}} />
+        <div className="relative z-10 flex flex-1 flex-col justify-between">
+          <div className="space-y-6">
+            <Logo size={88} />
+            <div className="space-y-2">
+              <p className="text-[2rem] font-semibold leading-tight text-white">SMK Negeri 11 Jakarta</p>
+              <p className="text-lg text-white">Sistem Presensi Siswa</p>
+            </div>
           </div>
+          <p className="max-w-md text-sm text-white/75">
+            Sistem informasi presensi harian siswa resmi berbasis role (Ketua Kelas, Guru Piket, Admin).
+          </p>
         </div>
-        <p className="max-w-md text-sm text-white/75">
-          Sistem informasi presensi harian siswa resmi berbasis role (Ketua Kelas, Guru Piket, Admin).
-        </p>
       </section>
 
       <section className="flex flex-col justify-center px-6 py-12 sm:px-12 md:px-16 lg:px-20 xl:px-28">
