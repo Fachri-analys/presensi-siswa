@@ -49,6 +49,10 @@
   grid-template-columns: repeat(auto-fit, minmax(var(--stat-min, 8.5rem), 1fr));
 }
 
+@utility batik-overlay {
+  background: linear-gradient(180deg, rgba(10, 50, 95, 0), rgba(10, 50, 95, 0.88));
+}
+
 @keyframes page-enter {
   from { opacity: 0; filter: blur(4px); transform: translate3d(36px, 0, 0); }
   to { opacity: 1; filter: blur(0); transform: translate3d(0, 0, 0); }

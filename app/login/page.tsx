@@ -68,7 +68,7 @@ export default function LoginPage() {
     <main className="page-enter grid min-h-screen lg:grid-cols-[minmax(22rem,5fr)_7fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 lg:flex xl:p-16">
         <BatikBetawi />
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={{background:"linear-gradient(180deg,rgba(10,50,95,0),rgba(10,50,95,.88))"}} />
+        <div aria-hidden className="pointer-events-none absolute inset-0 batik-overlay" />
         <div className="relative z-10 flex flex-1 flex-col justify-between">
           <div className="space-y-6">
             <Logo size={88} />
