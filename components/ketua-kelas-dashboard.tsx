@@ -32,6 +32,7 @@ import { apiErrorMessage } from "@/lib/data/api-client";
 import { createApiSchoolRepository } from "@/lib/data/api-school";
 import type { AttendanceRecord, SchoolClass, SchoolStudent } from "@/lib/data/contracts";
 import { SuratSakitModal } from "./surat-sakit-modal";
+import { RiwayatSuratSakitModal } from "./riwayat-surat-sakit-modal";
 
 // Ketua Kelas hanya melihat kelas yang ditetapkan pada sesi server.
 const PRESENT: Status[] = ["HADIR", "TERLAMBAT"];
@@ -80,6 +81,7 @@ interface FormProps {
 function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }: FormProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [selectedNis, setSelectedNis] = useState(target?.nis ?? "");
+  const [selectedStatus, setSelectedStatus] = useState<Status | "">(target?.status ?? "");
   const presentAllowed = presentAllowedFor(selectedNis);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -120,7 +122,12 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
       {formError && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{formError}</p>}
       <label className="grid gap-2 text-sm font-medium">
         Status
-        <select name="status" defaultValue={target?.status ?? ""} className={field}>
+        <select
+          name="status"
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value as Status)}
+          className={field}
+        >
           <option value="" disabled>Pilih status</option>
           {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
             <option key={s} value={s} disabled={PRESENT.includes(s) && !presentAllowed}>
@@ -129,6 +136,12 @@ function PresensiForm({ options, target, presentAllowedFor, onSubmit, onCancel }
           ))}
         </select>
       </label>
+      {selectedStatus === "SAKIT" && (
+        <div className="flex items-start gap-2 rounded-md bg-info-soft p-3 text-xs text-info">
+          <Info size={14} className="shrink-0 mt-0.5" aria-hidden />
+          <span>Status Sakit memerlukan surat dokter/keterangan sakit yang telah divalidasi oleh Guru Piket. Jika belum tervalidasi, unggah surat sakit terlebih dahulu.</span>
+        </div>
+      )}
       {!presentAllowed && (
         <div className="flex items-start gap-2 rounded-md bg-warning-soft p-3 text-xs text-warning">
           <Info size={14} className="shrink-0 mt-0.5" aria-hidden />
@@ -200,6 +213,7 @@ export function KetuaKelasDashboard() {
   const [statusFilter, setStatusFilter] = useState<Status | "BELUM" | "">("");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [suratSakitOpen, setSuratSakitOpen] = useState(false);
+  const [riwayatSuratOpen, setRiwayatSuratOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -270,6 +284,14 @@ export function KetuaKelasDashboard() {
       >
         <FilePlus size={16} aria-hidden />
         <span>Surat Sakit</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setRiwayatSuratOpen(true)}
+        className={`${btn.outline} px-3 sm:px-4 text-xs sm:text-sm`}
+      >
+        <Clock size={16} aria-hidden />
+        <span>Status Surat</span>
       </button>
       <Link
         href="/laporan"
@@ -504,6 +526,13 @@ export function KetuaKelasDashboard() {
         open={suratSakitOpen}
         onClose={() => setSuratSakitOpen(false)}
         initialClassId={kelasId || undefined}
+        onSuccess={() => void refresh()}
+      />
+
+      <RiwayatSuratSakitModal
+        open={riwayatSuratOpen}
+        onClose={() => setRiwayatSuratOpen(false)}
+        kelasId={kelasId}
       />
     </div>
   );

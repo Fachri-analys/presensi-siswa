@@ -25,6 +25,7 @@ interface SuratSakitModalProps {
   onClose: () => void;
   initialClassId?: string;
   initialNis?: string;
+  onSuccess?: () => void;
 }
 
 const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
@@ -41,6 +42,7 @@ export function SuratSakitModal({
   onClose,
   initialClassId,
   initialNis,
+  onSuccess,
 }: SuratSakitModalProps) {
   const { role, kelasId: sessionClassId } = useRole();
   const isKetuaKelas = role === "KETUA_KELAS";
@@ -245,6 +247,7 @@ export function SuratSakitModal({
       });
 
       setStatus("success");
+      onSuccess?.();
     } catch (err: unknown) {
       setStatus("error");
       const message = err instanceof Error ? err.message : "Gagal mengunggah surat sakit. Terjadi gangguan koneksi.";

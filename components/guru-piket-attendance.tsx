@@ -305,6 +305,14 @@ export function GuruPiketAttendance({ initialClassId }: { initialClassId: string
         open={suratSakitOpen}
         onClose={() => setSuratSakitOpen(false)}
         initialClassId={classId}
+        onSuccess={async () => {
+          const attendanceRepo = createApiAttendanceRepository();
+          if (attendanceRepo && classId) {
+            try {
+              setSavedRecords(await attendanceRepo.listClassAttendance(classId, date));
+            } catch { /* silent */ }
+          }
+        }}
       />
     </div>
   );

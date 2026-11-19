@@ -15,18 +15,20 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly status: number | null;
   readonly requestId: string | null;
+  readonly serverMessage?: string;
 
   constructor(
     code: ApiErrorCode,
     status: number | null,
     requestId: string | null,
-    options?: ErrorOptions,
+    options?: ErrorOptions & { serverMessage?: string },
   ) {
     super("Permintaan belum berhasil. Coba lagi atau hubungi administrator sekolah.", options);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.requestId = requestId;
+    this.serverMessage = options?.serverMessage;
   }
 }
 
@@ -52,6 +54,7 @@ export function createConfiguredApiClient(fetcher?: typeof fetch) {
 
 export function apiErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "Terjadi kendala. Coba lagi beberapa saat.";
+  if (error.serverMessage) return error.serverMessage;
   switch (error.code) {
     case "NETWORK_ERROR":
       return "Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.";
@@ -164,7 +167,18 @@ export function createApiClient(baseUrl: string, fetcher: typeof fetch = fetch) 
       ) {
         window.location.href = "/login";
       }
-      throw new ApiError(code, response.status, requestId);
+      let serverMessage: string | undefined;
+      try {
+        const errorData = await response.json();
+        if (typeof errorData?.message === "string") {
+          serverMessage = errorData.message;
+        } else if (Array.isArray(errorData?.message) && typeof errorData.message[0] === "string") {
+          serverMessage = errorData.message.join(", ");
+        }
+      } catch {
+        // Abaikan jika respons bukan JSON
+      }
+      throw new ApiError(code, response.status, requestId, { serverMessage });
     }
 
     if (response.status === 204) {
