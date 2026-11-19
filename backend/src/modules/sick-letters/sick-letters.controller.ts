@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Header,
@@ -17,6 +18,7 @@ import { createReadStream } from 'node:fs';
 import { SickLettersService, type UploadFile } from './sick-letters.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
 import { QuerySickLettersDto } from './dto/query-sick-letters.dto';
+import { ValidateSickLetterDto } from './dto/validate-sick-letter.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
@@ -52,6 +54,27 @@ export class SickLettersController {
     @Headers('idempotency-key') idempotencyKey: string,
   ) {
     return this.sickLettersService.uploadFile(dto, file, user, idempotencyKey);
+  }
+
+  @Get('pending')
+  @Roles(Role.ADMIN, Role.GURU_PIKET)
+  @ApiOperation({ summary: 'Daftar surat izin/sakit yang menunggu validasi Guru Piket' })
+  findPending(
+    @Query() query: QuerySickLettersDto,
+    @CurrentUser() user: SessionUser,
+  ) {
+    return this.sickLettersService.findPending(query, user);
+  }
+
+  @Patch(':id/validate')
+  @Roles(Role.ADMIN, Role.GURU_PIKET)
+  @ApiOperation({ summary: 'Validasi surat sakit oleh Guru Piket atau Admin' })
+  validate(
+    @Param('id') id: string,
+    @Body() dto: ValidateSickLetterDto,
+    @CurrentUser() user: SessionUser,
+  ) {
+    return this.sickLettersService.validateLetter(id, dto, user);
   }
 
   @Get(':id/file')

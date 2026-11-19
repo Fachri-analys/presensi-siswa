@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SickLettersService } from './sick-letters.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role, SickLetterStatus } from '@prisma/client';
+import { todayWib } from '../../common/utils/time.util';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -27,12 +28,18 @@ describe('SickLettersService (Keamanan Upload File)', () => {
       },
       sickLetter: {
         create: jest.fn(),
+        update: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
         findUnique: jest.fn().mockResolvedValue(null),
       },
       attendance: {
         upsert: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
       },
     };
 
@@ -189,5 +196,79 @@ describe('SickLettersService (Keamanan Upload File)', () => {
 
     expect(fs.rmSync).toHaveBeenCalledWith(allowedFile, { force: true });
     expect(fs.rmSync).not.toHaveBeenCalledWith(path.resolve(outsideFile), { force: true });
+  });
+
+  it('[VALIDASI-01] uploadFile() oleh Ketua Kelas menghasilkan status PENDING tanpa langsung mencatat SAKIT', async () => {
+    const ketuaUser = { id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas', role: Role.KETUA_KELAS, kelasId: 'cls-1' };
+    const validFile = {
+      originalname: 'surat.png',
+      mimetype: 'image/png',
+      size: 1024,
+      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    };
+
+    mockPrisma.student.findFirst.mockResolvedValueOnce({ id: 'std-1', kelasId: 'cls-1' });
+    mockPrisma.sickLetter.create.mockImplementation((args: { data: Record<string, unknown> }) => Promise.resolve(args.data));
+
+    const result = await service.uploadFile(
+      { date: todayWib(), kelasId: 'cls-1', studentId: 'std-1', keterangan: 'Demam tinggi' },
+      validFile,
+      ketuaUser,
+      '22222222-2222-4222-8222-222222222222',
+    );
+
+    expect(result.status).toBe(SickLetterStatus.PENDING);
+    expect(result.verifiedById).toBeNull();
+    expect(mockPrisma.attendance.upsert).not.toHaveBeenCalled();
+  });
+
+  it('[VALIDASI-02] validateLetter() oleh Guru Piket mengubah status ke VALID dan mencatat SAKIT', async () => {
+    const guruUser = { id: 'usr-guru', email: 'guru@test.com', nama: 'Guru Piket', role: Role.GURU_PIKET, kelasId: null };
+    const mockLetter = {
+      id: 'let-1',
+      date: new Date('2026-10-16'),
+      kelasId: 'cls-1',
+      studentId: 'std-1',
+      keterangan: 'Demam tinggi',
+      status: SickLetterStatus.PENDING,
+      student: { id: 'std-1', nis: '241101', nama: 'Ahmad' },
+    };
+
+    mockPrisma.sickLetter.findUnique.mockResolvedValueOnce(mockLetter);
+    mockPrisma.sickLetter.update.mockResolvedValueOnce({
+      ...mockLetter,
+      status: SickLetterStatus.VALID,
+      verifiedById: guruUser.id,
+      verifiedAt: new Date(),
+      catatanValidator: 'Surat dokter valid',
+    });
+
+    const result = await service.validateLetter(
+      'let-1',
+      { status: SickLetterStatus.VALID, catatan: 'Surat dokter valid' },
+      guruUser,
+    );
+
+    expect(result.status).toBe(SickLetterStatus.VALID);
+    expect(mockPrisma.sickLetter.update).toHaveBeenCalled();
+    expect(mockPrisma.attendance.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ status: 'SAKIT' }),
+      update: expect.objectContaining({ status: 'SAKIT' }),
+    }));
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'SICK_LETTER_VALIDATED' }),
+    }));
+  });
+
+  it('[VALIDASI-03] validateLetter() ditolak jika dipanggil oleh Ketua Kelas', async () => {
+    const ketuaUser = { id: 'usr-ketua', email: 'ketua@test.com', nama: 'Ketua Kelas', role: Role.KETUA_KELAS, kelasId: 'cls-1' };
+
+    await expect(
+      service.validateLetter(
+        'let-1',
+        { status: SickLetterStatus.VALID },
+        ketuaUser,
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

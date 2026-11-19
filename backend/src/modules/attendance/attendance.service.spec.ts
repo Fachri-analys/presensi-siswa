@@ -41,6 +41,9 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       attendancePermission: {
         findFirst: jest.fn(),
       },
+      sickLetter: {
+        findFirst: jest.fn(),
+      },
       student: {
         findMany: jest.fn(),
       },
@@ -296,6 +299,11 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
       { id: 'std-1', nis: '241101' },
     ]);
 
+    mockPrisma.sickLetter.findFirst.mockResolvedValueOnce({
+      id: 'sck-1',
+      status: 'VALID',
+    });
+
     mockPrisma.attendance.upsert.mockResolvedValueOnce({
       id: 'att-1',
       kelasId: 'cls-own',
@@ -322,6 +330,31 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     expect(result[0].status).toBe(AttendanceStatus.SAKIT);
   });
 
+  it('[B3-02-SAKIT-VALIDASI] saveBatch() menolak status SAKIT dari Ketua Kelas jika surat sakit belum divalidasi Guru Piket', async () => {
+    const ketuaUser = {
+      id: 'usr-ketua',
+      email: 'ketua@test.com',
+      nama: 'Ketua Kelas',
+      role: Role.KETUA_KELAS,
+      kelasId: 'cls-own',
+    };
+
+    mockNowWibTime.mockReturnValue('17:00');
+    mockPrisma.student.findMany.mockResolvedValueOnce([{ id: 'std-1', nis: '241101' }]);
+    mockPrisma.sickLetter.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.saveBatch(
+        {
+          date: '2026-10-16',
+          kelasId: 'cls-own',
+          records: [{ nis: '241101', status: AttendanceStatus.SAKIT, keterangan: 'Demam' }],
+        },
+        ketuaUser,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   // [B3-03] Ketua Kelas boleh mencatat HADIR dalam window sesi yang terbuka
   it('[B3-03] saveBatch() mengizinkan HADIR dari Ketua Kelas dalam window sesi terbuka', async () => {
     const ketuaUser = {
@@ -341,6 +374,11 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     mockPrisma.student.findMany.mockResolvedValueOnce([
       { id: 'std-1', nis: '241101' },
     ]);
+
+    mockPrisma.sickLetter.findFirst.mockResolvedValueOnce({
+      id: 'sck-1',
+      status: 'VALID',
+    });
 
     mockPrisma.attendance.upsert.mockResolvedValueOnce({
       id: 'att-1',
@@ -382,6 +420,11 @@ describe('AttendanceService (Batch Presensi, Transaksi, N+1, IDOR)', () => {
     mockPrisma.student.findMany.mockResolvedValueOnce([
       { id: 'std-1', nis: '241101' },
     ]);
+
+    mockPrisma.sickLetter.findFirst.mockResolvedValueOnce({
+      id: 'sck-1',
+      status: 'VALID',
+    });
 
     mockPrisma.attendance.upsert.mockResolvedValueOnce({
       id: 'att-1',

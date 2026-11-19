@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -105,8 +106,15 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto) {
+    const cleanEmail = dto.email.toLowerCase().trim();
+    const cleanNama = dto.nama.trim();
+
+    if (dto.password.toLowerCase() === cleanEmail || dto.password.toLowerCase() === cleanNama.toLowerCase()) {
+      throw new BadRequestException('Kata sandi tidak boleh sama dengan email atau nama pengguna.');
+    }
+
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
     if (existing) {
@@ -118,8 +126,8 @@ export class UsersService {
 
     const user = await this.prisma.user.create({
       data: {
-        nama: dto.nama.trim(),
-        email: dto.email.toLowerCase().trim(),
+        nama: cleanNama,
+        email: cleanEmail,
         role: dto.role,
         passwordHash,
         kelasId: dto.kelasId ?? null,
@@ -171,6 +179,11 @@ export class UsersService {
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.kelasId !== undefined) data.kelasAsLeader = dto.kelasId ? { connect: { id: dto.kelasId } } : { disconnect: true };
     if (dto.password) {
+      const emailToCheck = (dto.email ?? current.email).toLowerCase().trim();
+      const namaToCheck = (dto.nama ?? current.nama).toLowerCase().trim();
+      if (dto.password.toLowerCase() === emailToCheck || dto.password.toLowerCase() === namaToCheck) {
+        throw new BadRequestException('Kata sandi tidak boleh sama dengan email atau nama pengguna.');
+      }
       data.passwordHash = await bcrypt.hash(dto.password, Number(process.env.BCRYPT_ROUNDS ?? 12));
     }
 

@@ -9,7 +9,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
 import { QuerySickLettersDto } from './dto/query-sick-letters.dto';
-import { AttendanceStatus, Role } from '@prisma/client';
+import { ValidateSickLetterDto } from './dto/validate-sick-letter.dto';
+import { AttendanceStatus, Role, SickLetterStatus } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -55,6 +56,10 @@ export class SickLettersService {
       throw new BadRequestException('File surat izin/sakit wajib diunggah.');
     }
 
+    if (file.size < 8) {
+      throw new BadRequestException('Ukuran file terlalu kecil atau tidak valid.');
+    }
+
     // 1. Validasi Keamanan Ukuran File
     if (file.size > MAX_FILE_SIZE) {
       throw new BadRequestException('Ukuran file melebihi batas maksimum 5 MB.');
@@ -92,9 +97,20 @@ export class SickLettersService {
     }
 
     const recordDate = parseDateOnly(dto.date);
+    if (dto.date > todayWib()) {
+      throw new BadRequestException('Tanggal surat sakit tidak boleh di masa mendatang.');
+    }
     if (user.role === Role.KETUA_KELAS && dto.date !== todayWib()) {
       throw new ForbiddenException('Ketua Kelas hanya dapat mengirim surat untuk tanggal hari ini.');
     }
+
+    const isGuruOrAdmin = user.role === Role.GURU_PIKET || user.role === Role.ADMIN;
+    const initialStatus = isGuruOrAdmin ? SickLetterStatus.VALID : SickLetterStatus.PENDING;
+    const verifiedById = isGuruOrAdmin ? user.id : null;
+    const verifiedAt = isGuruOrAdmin ? new Date() : null;
+    const catatanValidator = isGuruOrAdmin
+      ? `Divalidasi langsung saat pengunggahan oleh ${user.role === Role.ADMIN ? 'Admin' : 'Guru Piket'}`
+      : null;
 
     const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
     const requestHash = crypto.createHash('sha256').update(JSON.stringify({
@@ -124,12 +140,16 @@ export class SickLettersService {
             date: recordDate,
             kelasId: dto.kelasId,
             studentId: student.id,
-            keterangan: dto.keterangan,
+            keterangan: dto.keterangan.trim(),
             fileName: randomName,
             filePath: destinationPath,
             fileSize: file.size,
             mimeType: file.mimetype,
             uploadedById: user.id,
+            status: initialStatus,
+            verifiedById,
+            verifiedAt,
+            catatanValidator,
             idempotencyKey,
             requestHash,
           },
@@ -139,6 +159,10 @@ export class SickLettersService {
             kelasId: true,
             studentId: true,
             keterangan: true,
+            status: true,
+            verifiedById: true,
+            verifiedAt: true,
+            catatanValidator: true,
             fileName: true,
             fileSize: true,
             mimeType: true,
@@ -146,25 +170,27 @@ export class SickLettersService {
             createdAt: true,
           },
         });
-        await tx.attendance.upsert({
-          where: { date_kelasId_studentId: { date: recordDate, kelasId: dto.kelasId, studentId: student.id } },
-          create: {
-            date: recordDate,
-            kelasId: dto.kelasId,
-            studentId: student.id,
-            status: AttendanceStatus.SAKIT,
-            waktu: null,
-            keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
-            createdById: user.id,
-            updatedById: user.id,
-          },
-          update: {
-            status: AttendanceStatus.SAKIT,
-            waktu: null,
-            keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
-            updatedById: user.id,
-          },
-        });
+        if (initialStatus === SickLetterStatus.VALID) {
+          await tx.attendance.upsert({
+            where: { date_kelasId_studentId: { date: recordDate, kelasId: dto.kelasId, studentId: student.id } },
+            create: {
+              date: recordDate,
+              kelasId: dto.kelasId,
+              studentId: student.id,
+              status: AttendanceStatus.SAKIT,
+              waktu: null,
+              keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
+              createdById: user.id,
+              updatedById: user.id,
+            },
+            update: {
+              status: AttendanceStatus.SAKIT,
+              waktu: null,
+              keterangan: `Surat sakit: ${dto.keterangan.trim()}`.slice(0, 120),
+              updatedById: user.id,
+            },
+          });
+        }
         return letter;
       });
     } catch (error) {
@@ -194,6 +220,10 @@ export class SickLettersService {
         kelasId: true,
         studentId: true,
         keterangan: true,
+        status: true,
+        verifiedById: true,
+        verifiedAt: true,
+        catatanValidator: true,
         fileName: true,
         fileSize: true,
         mimeType: true,
@@ -210,7 +240,14 @@ export class SickLettersService {
 
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
-    const where = { kelasId };
+    const where: any = { kelasId };
+    if (query.status) {
+      where.status = query.status;
+    }
+    if (query.date) {
+      where.date = parseDateOnly(query.date);
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.sickLetter.findMany({
         where,
@@ -222,12 +259,18 @@ export class SickLettersService {
           kelasId: true,
           studentId: true,
           keterangan: true,
+          status: true,
+          verifiedById: true,
+          verifiedAt: true,
+          catatanValidator: true,
           fileName: true,
           fileSize: true,
           mimeType: true,
           uploadedById: true,
           createdAt: true,
           student: { select: { nis: true, nama: true } },
+          verifiedBy: { select: { id: true, nama: true, role: true } },
+          uploadedBy: { select: { id: true, nama: true, role: true } },
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
@@ -242,6 +285,186 @@ export class SickLettersService {
       totalPages: Math.ceil(total / limit),
       nextCursor: page * limit < total ? String(page + 1) : null,
     };
+  }
+
+  async findPending(query: QuerySickLettersDto, user: SessionUser) {
+    if (user.role !== Role.GURU_PIKET && user.role !== Role.ADMIN) {
+      throw new ForbiddenException('Akses ditolak: Hanya Guru Piket dan Admin yang dapat melihat antrean validasi.');
+    }
+
+    const page = Math.max(1, Number(query.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
+    const where: any = { status: SickLetterStatus.PENDING };
+    if (query.date) {
+      where.date = parseDateOnly(query.date);
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.sickLetter.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          date: true,
+          kelasId: true,
+          studentId: true,
+          keterangan: true,
+          status: true,
+          verifiedById: true,
+          verifiedAt: true,
+          catatanValidator: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          uploadedById: true,
+          createdAt: true,
+          student: { select: { nis: true, nama: true } },
+          kelas: { select: { id: true, nama: true, jurusan: true } },
+          uploadedBy: { select: { id: true, nama: true, role: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+      this.prisma.sickLetter.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      nextCursor: page * limit < total ? String(page + 1) : null,
+    };
+  }
+
+  async validateLetter(id: string, dto: ValidateSickLetterDto, user: SessionUser) {
+    if (user.role !== Role.GURU_PIKET && user.role !== Role.ADMIN) {
+      throw new ForbiddenException('Hanya Guru Piket dan Admin yang berwenang memvalidasi surat sakit.');
+    }
+
+    const letter = await this.prisma.sickLetter.findUnique({
+      where: { id },
+      include: { student: { select: { id: true, nis: true, nama: true } } },
+    });
+    if (!letter) {
+      throw new NotFoundException('Surat sakit tidak ditemukan.');
+    }
+
+    const now = new Date();
+    const catatan = dto.catatan?.trim() ? dto.catatan.trim().slice(0, 255) : null;
+
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.sickLetter.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          verifiedById: user.id,
+          verifiedAt: now,
+          catatanValidator: catatan,
+        },
+        select: {
+          id: true,
+          date: true,
+          kelasId: true,
+          studentId: true,
+          keterangan: true,
+          status: true,
+          verifiedById: true,
+          verifiedAt: true,
+          catatanValidator: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          uploadedById: true,
+          createdAt: true,
+          student: { select: { nis: true, nama: true } },
+          verifiedBy: { select: { id: true, nama: true, role: true } },
+        },
+      });
+
+      if (dto.status === SickLetterStatus.VALID) {
+        await tx.attendance.upsert({
+          where: {
+            date_kelasId_studentId: {
+              date: letter.date,
+              kelasId: letter.kelasId,
+              studentId: letter.studentId,
+            },
+          },
+          create: {
+            date: letter.date,
+            kelasId: letter.kelasId,
+            studentId: letter.studentId,
+            status: AttendanceStatus.SAKIT,
+            waktu: null,
+            keterangan: `Surat sakit divalidasi Guru Piket: ${letter.keterangan.trim()}`.slice(0, 120),
+            createdById: user.id,
+            updatedById: user.id,
+          },
+          update: {
+            status: AttendanceStatus.SAKIT,
+            waktu: null,
+            keterangan: `Surat sakit divalidasi Guru Piket: ${letter.keterangan.trim()}`.slice(0, 120),
+            updatedById: user.id,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorId: user.id,
+            action: 'SICK_LETTER_VALIDATED',
+            objectType: 'SICK_LETTER',
+            objectId: letter.id,
+            result: 'SUCCESS',
+            metadata: {
+              status: dto.status,
+              studentId: letter.studentId,
+              date: letter.date,
+              catatan,
+            },
+          },
+        });
+      } else if (dto.status === SickLetterStatus.INVALID) {
+        const existingAtt = await tx.attendance.findUnique({
+          where: {
+            date_kelasId_studentId: {
+              date: letter.date,
+              kelasId: letter.kelasId,
+              studentId: letter.studentId,
+            },
+          },
+        });
+        if (existingAtt && existingAtt.status === AttendanceStatus.SAKIT) {
+          await tx.attendance.update({
+            where: { id: existingAtt.id },
+            data: {
+              status: AttendanceStatus.ALPA,
+              keterangan: `Surat sakit ditolak Guru Piket: ${catatan ?? 'Tidak valid'}`.slice(0, 120),
+              updatedById: user.id,
+            },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            actorId: user.id,
+            action: 'SICK_LETTER_REJECTED',
+            objectType: 'SICK_LETTER',
+            objectId: letter.id,
+            result: 'SUCCESS',
+            metadata: {
+              status: dto.status,
+              studentId: letter.studentId,
+              date: letter.date,
+              catatan,
+            },
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 
   async getFile(id: string, user: SessionUser) {

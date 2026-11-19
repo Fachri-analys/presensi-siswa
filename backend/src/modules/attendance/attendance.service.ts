@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { BatchAttendanceDto } from './dto/batch-attendance.dto';
 import { QueryAttendanceDto, QueryHistoryDto, QueryRecapDto } from './dto/query-attendance.dto';
-import { ActiveStatus, AttendanceStatus, Role } from '@prisma/client';
+import { ActiveStatus, AttendanceStatus, Role, SickLetterStatus } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import { parseDateOnly, nowWibTime, todayWib } from '../../common/utils/time.util';
 import { assertClassAccess } from '../../common/utils/access-control.util';
@@ -97,6 +97,25 @@ export class AttendanceService {
           });
           if (consumed.count !== 1) {
             throw new ForbiddenException('Izin Guru Piket untuk siswa ini sudah digunakan.');
+          }
+        }
+
+        if (
+          user.role === Role.KETUA_KELAS &&
+          rec.status === AttendanceStatus.SAKIT
+        ) {
+          const validLetter = await tx.sickLetter.findFirst({
+            where: {
+              date: attendanceDate,
+              kelasId: dto.kelasId,
+              studentId,
+              status: SickLetterStatus.VALID,
+            },
+          });
+          if (!validLetter) {
+            throw new ForbiddenException(
+              'Pencatatan status Sakit oleh Ketua Kelas memerlukan surat sakit yang telah divalidasi oleh Guru Piket.',
+            );
           }
         }
 
@@ -478,6 +497,22 @@ export class AttendanceService {
           data: { usedAt: new Date(), usedById: user.id },
         });
         if (consumed.count !== 1) throw new ForbiddenException('Izin Guru Piket untuk siswa ini sudah digunakan.');
+      }
+
+      if (user.role === Role.KETUA_KELAS && dto.status === AttendanceStatus.SAKIT) {
+        const validLetter = await tx.sickLetter.findFirst({
+          where: {
+            date: attendance.date,
+            kelasId: attendance.kelasId,
+            studentId: attendance.studentId,
+            status: SickLetterStatus.VALID,
+          },
+        });
+        if (!validLetter) {
+          throw new ForbiddenException(
+            'Pencatatan status Sakit oleh Ketua Kelas memerlukan surat sakit yang telah divalidasi oleh Guru Piket.',
+          );
+        }
       }
 
       const updated = await tx.attendance.update({

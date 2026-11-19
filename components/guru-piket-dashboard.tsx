@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Clock,
   Eye,
+  FileCheck,
   FileText,
   HeartPulse,
   Info,
@@ -22,6 +23,7 @@ import { getLocalDateKey } from "@/lib/time";
 import { classProgress, pct } from "@/lib/stats";
 import type { ClassSummary } from "@/lib/types";
 import { Badge, btn, card, EmptyState, field, Pagination, StatCard } from "./ui";
+import { ValidasiSuratSakit, usePendingLetterCount } from "./validasi-surat-sakit";
 
 type Summary = ClassSummary & { id: string; nama: string; jurusan: string };
 const PAGE_SIZE = 8;
@@ -42,6 +44,8 @@ export function GuruPiketDashboard() {
   const [kelasId, setKelasId] = useState("");
   const [jurusan, setJurusan] = useState("");
   const [page, setPage] = useState(1);
+  const [showValidasi, setShowValidasi] = useState(false);
+  const { count: pendingCount, refresh: refreshPending } = usePendingLetterCount();
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -101,6 +105,19 @@ export function GuruPiketDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowValidasi((v) => !v)}
+            className={`${btn.outline} relative`}
+          >
+            <FileCheck size={16} aria-hidden />
+            <span>Validasi Surat</span>
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-danger text-[10px] font-bold text-white">
+                {pendingCount > 99 ? "99+" : pendingCount}
+              </span>
+            )}
+          </button>
           <Link href="/presensi" className={btn.primary}>
             <ClipboardCheck size={16} aria-hidden />
             <span>Isi Presensi</span>
@@ -140,6 +157,19 @@ export function GuruPiketDashboard() {
           <span>Jumlah Hadir sudah termasuk siswa yang terlambat; rincian siswa terlambat dapat dilihat di halaman detail kelas.</span>
         </div>
       </section>
+
+      {/* Validasi Surat Sakit Panel */}
+      {showValidasi && (
+        <section aria-label="Antrean validasi surat sakit" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-ink">Surat Menunggu Validasi</h2>
+            <button type="button" onClick={() => setShowValidasi(false)} className="text-xs text-muted hover:text-ink transition-colors">
+              Tutup
+            </button>
+          </div>
+          <ValidasiSuratSakit onValidated={refreshPending} />
+        </section>
+      )}
 
       {/* Search & Filter Controls */}
       <section aria-label="Filter dan pencarian kelas" className={`${card} p-3.5 sm:p-4`}>

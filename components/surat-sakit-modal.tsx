@@ -89,6 +89,7 @@ export function SuratSakitModal({
     fileName: string;
     fileSize: string;
     fileUrl: string;
+    letterStatus: "PENDING" | "VALID";
   } | null>(null);
 
   function resetForm() {
@@ -240,6 +241,7 @@ export function SuratSakitModal({
         fileName: selectedFile!.name,
         fileSize: formatFileSize(selectedFile!.size),
         fileUrl: new URL(`sick-letters/${uploadedId}/file`, baseUrl).toString(),
+        letterStatus: savedLetter.status === "VALID" ? "VALID" : "PENDING",
       });
 
       setStatus("success");
@@ -262,7 +264,9 @@ export function SuratSakitModal({
             </div>
             <h3 className="text-base font-semibold text-ink">Surat Sakit Berhasil Dikirim</h3>
             <p className="text-sm text-muted max-w-sm">
-              Berkas dan keterangan telah berhasil tercatat. Status presensi siswa pada tanggal terkait telah diperbarui menjadi <strong>Sakit</strong>.
+              {submittedInfo.letterStatus === "PENDING"
+                ? "Berkas dan keterangan telah tercatat. Surat menunggu validasi oleh Guru Piket sebelum status presensi diperbarui menjadi Sakit."
+                : <>Berkas dan keterangan telah berhasil tercatat. Status presensi siswa pada tanggal terkait telah diperbarui menjadi <strong>Sakit</strong>.</>}
             </p>
           </div>
 
@@ -293,6 +297,16 @@ export function SuratSakitModal({
               <span className="font-medium text-primary text-xs flex items-center gap-1">
                 <FileCheck size={14} />
                 {submittedInfo.fileName} ({submittedInfo.fileSize})
+              </span>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted text-xs">Status Surat</span>
+              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                submittedInfo.letterStatus === "VALID"
+                  ? "bg-success-soft text-success"
+                  : "bg-warning-soft text-warning"
+              }`}>
+                {submittedInfo.letterStatus === "VALID" ? "Tervalidasi" : "Menunggu Validasi"}
               </span>
             </div>
           </div>

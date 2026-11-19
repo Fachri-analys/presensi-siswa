@@ -31,6 +31,12 @@ enum AttendanceSession {
   SIANG
 }
 
+enum SickLetterStatus {
+  PENDING
+  VALID
+  INVALID
+}
+
 enum AuditResult {
   SUCCESS
   FAILURE
@@ -54,6 +60,7 @@ model User {
   auditLogs            AuditLog[]
   schedulesUpdated     Schedule[]               @relation("ScheduleUpdatedBy")
   sickLettersUploaded  SickLetter[]             @relation("SickLetterUploadedBy")
+  sickLettersVerified  SickLetter[]             @relation("SickLetterVerifiedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -202,15 +209,21 @@ model SickLetter {
   fileSize     Int      @map("file_size")
   mimeType     String   @map("mime_type")
   uploadedById String   @map("uploaded_by_id")
+  status       SickLetterStatus @default(PENDING)
+  verifiedById String?  @map("verified_by_id")
+  verifiedAt   DateTime? @map("verified_at")
+  catatanValidator String? @map("catatan_validator")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   uploadedBy User    @relation("SickLetterUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  verifiedBy User?   @relation("SickLetterVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
   kelas      Class   @relation(fields: [kelasId], references: [id], onDelete: Cascade)
   student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([date, kelasId])
   @@index([studentId])
+  @@index([status])
   @@map("sick_letters")
 }
 
