@@ -18,18 +18,25 @@ Terima kasih sudah membantu mengembangkan Sistem Presensi Siswa. Dokumen ini men
 - Jangan menampilkan stack trace, pesan mentah database, atau rahasia kepada pengguna.
 - Gunakan pull request untuk perubahan bersama; jelaskan kebutuhan, perilaku, risiko, serta langkah pengujian.
 
-## Validasi frontend saat ini
+## Validasi pengujian dan kualitas kode
 
-Jalankan dari root frontend:
+Sebelum mengirimkan pull request, pastikan seluruh pengujian dan pemeriksaan lulus tanpa galat:
 
+### Frontend
 ```bash
-npm ci
-npm run lint
-npx tsc --noEmit --noUnusedLocals --noUnusedParameters
-npm run build
+npm run lint          # ESLint pemeriksaan aturan kode
+npm run typecheck     # TypeScript strict type check
+npm test              # Pengujian unit & integrasi (Vitest)
+npm run build         # Verifikasi Next.js production build
 ```
 
-Skrip test otomatis belum tersedia pada frontend. Jika perubahan menyentuh integrasi, tambahkan test yang relevan dan jelaskan skenario manual yang sudah diuji.
+### Backend
+```bash
+npm --prefix backend run lint       # ESLint backend
+npm --prefix backend run typecheck  # TypeScript compiler check
+npm --prefix backend test           # Pengujian unit & service (Jest)
+npm --prefix backend run build      # Verifikasi NestJS production build
+```
 
 ## Ketentuan backend
 

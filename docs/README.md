@@ -40,7 +40,7 @@ npm --prefix backend ci
 1. **Migrasi & Seed Database Backend**:
    ```bash
    npm run backend:prisma:generate
-   npm --prefix backend run prisma:migrate
+   npm run backend:prisma:migrate
    npm run backend:prisma:seed
    ```
 2. **Jalankan Backend Dev Server (Port 4000)**:
