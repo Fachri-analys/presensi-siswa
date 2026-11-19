@@ -205,34 +205,33 @@ export function SuratSakitModal({
 
       const baseUrl = getApiBaseUrl();
       if (!baseUrl) throw new Error("Backend belum dikonfigurasi.");
-      let uploadedId = "";
       const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
       idempotencyKeyRef.current = idempotencyKey;
-      {
-        const formData = new FormData();
-        formData.append("file", selectedFile!);
-        formData.append("date", tanggal);
-        formData.append("kelasId", studentClassId);
-        formData.append("studentId", targetStudent?.id ?? nis);
-        formData.append("keterangan", keterangan.trim());
 
-        const uploadUrl = new URL("sick-letters/upload", baseUrl);
-        const res = await fetch(uploadUrl, {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-          headers: { "Idempotency-Key": idempotencyKey },
-        });
+      const formData = new FormData();
+      formData.append("file", selectedFile!);
+      formData.append("date", tanggal);
+      formData.append("kelasId", studentClassId);
+      formData.append("studentId", targetStudent?.id ?? nis);
+      formData.append("keterangan", keterangan.trim());
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          const errText = errData?.message || `Gagal mengunggah berkas (${res.status}).`;
-          throw new Error(errText);
-        }
+      const uploadUrl = new URL("sick-letters/upload", baseUrl);
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
 
-        const savedLetter = await res.json();
-        uploadedId = savedLetter.id;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        const errText = errData?.message || `Gagal mengunggah berkas (${res.status}).`;
+        throw new Error(errText);
       }
+
+      const savedLetter = await res.json();
+      const uploadedId = savedLetter.id;
+      const letterStatus: "VALID" | "PENDING" = savedLetter.status === "VALID" ? "VALID" : "PENDING";
 
       setSubmittedInfo({
         nama: studentName,
@@ -243,7 +242,7 @@ export function SuratSakitModal({
         fileName: selectedFile!.name,
         fileSize: formatFileSize(selectedFile!.size),
         fileUrl: new URL(`sick-letters/${uploadedId}/file`, baseUrl).toString(),
-        letterStatus: savedLetter.status === "VALID" ? "VALID" : "PENDING",
+        letterStatus,
       });
 
       setStatus("success");

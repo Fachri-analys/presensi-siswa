@@ -56,7 +56,7 @@ export function RiwayatSuratSakitModal({ open, onClose, kelasId }: RiwayatSuratS
 
   useEffect(() => {
     if (open) {
-      void fetchLetters();
+      void Promise.resolve().then(fetchLetters);
     }
   }, [open, fetchLetters]);
 

@@ -10,7 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSickLetterDto } from './dto/create-sick-letter.dto';
 import { QuerySickLettersDto } from './dto/query-sick-letters.dto';
 import { ValidateSickLetterDto } from './dto/validate-sick-letter.dto';
-import { AttendanceStatus, Role, SickLetterStatus } from '@prisma/client';
+import { AttendanceStatus, Prisma, Role, SickLetterStatus } from '@prisma/client';
 import type { SessionUser } from '../../common/types/session-user.type';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -240,7 +240,7 @@ export class SickLettersService {
 
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
-    const where: any = { kelasId };
+    const where: Prisma.SickLetterWhereInput = { kelasId };
     if (query.status) {
       where.status = query.status;
     }
@@ -294,7 +294,7 @@ export class SickLettersService {
 
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
-    const where: any = { status: SickLetterStatus.PENDING };
+    const where: Prisma.SickLetterWhereInput = { status: SickLetterStatus.PENDING };
     if (query.date) {
       where.date = parseDateOnly(query.date);
     }

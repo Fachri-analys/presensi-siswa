@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertCircle,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -59,7 +58,9 @@ export function ValidasiSuratSakit({ onValidated }: { onValidated?: () => void }
     }
   }, []);
 
-  useEffect(() => { void fetchPending(); }, [fetchPending]);
+  useEffect(() => {
+    void Promise.resolve().then(fetchPending);
+  }, [fetchPending]);
 
   async function handleValidate(letterId: string, status: "VALID" | "INVALID") {
     const baseUrl = getApiBaseUrl();
@@ -210,6 +211,8 @@ export function usePendingLetterCount() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+  }, [refresh]);
   return { count, refresh };
 }
