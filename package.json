@@ -12,6 +12,7 @@
     "backend:dev": "npm --prefix backend run start:dev",
     "backend:build": "npm --prefix backend run build",
     "backend:test": "npm --prefix backend run test",
+    "backend:prisma:migrate": "npm --prefix backend run prisma:migrate",
     "backend:prisma:generate": "npm --prefix backend run prisma:generate",
     "backend:prisma:seed": "npm --prefix backend run prisma:seed"
   },

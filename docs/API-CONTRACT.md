@@ -193,8 +193,11 @@ Tanggal dan kelas berada pada path agar server memvalidasinya sebagai scope batc
 
 | Method | Path | Format | Kegunaan |
 |---|---|---|---|
-| `POST` | `/sick-letters/upload` | `multipart/form-data` | Unggah surat dengan header UUID v4 `Idempotency-Key`; retry payload yang sama mengembalikan surat yang sama. Field: `file`, `date`, `kelasId`, `studentId`, `keterangan`. |
-| `GET` | `/sick-letters/class/{kelasId}?page=1&limit=20` | `application/json` | Riwayat surat bertahap, maksimal 100 baris per halaman; respons berisi `items`, `total`, `page`, `limit`, `totalPages`, dan `nextCursor`. |
+| `POST` | `/sick-letters/upload` | `multipart/form-data` | Unggah surat dengan header UUID v4 `Idempotency-Key`; retry payload yang sama mengembalikan surat yang sama. Field: `file`, `date`, `kelasId`, `studentId`, `keterangan`. Role Ketua Kelas menghasilkan status `PENDING`; Guru Piket/Admin menghasilkan `VALID` dan meng-upsert presensi `SAKIT`. |
+| `GET` | `/sick-letters/class/{kelasId}?page=1&limit=20` | `application/json` | Riwayat surat per kelas bertahap; respons berisi `items`, `total`, `page`, `limit`, `totalPages`, dan `nextCursor`. Akses Ketua Kelas dibatasi pada kelasnya. |
+| `GET` | `/sick-letters/pending?page=1&limit=20&date=` | `application/json` | Antrean surat sakit dengan status `PENDING` untuk verifikasi oleh Guru Piket dan Admin. |
+| `PATCH` | `/sick-letters/{id}/validate` | `application/json` | Validasi surat oleh Guru Piket/Admin. Body: `{ status: "VALID" | "INVALID", catatan?: string }`. Status `VALID` meng-upsert presensi `SAKIT`; status `INVALID` mengembalikan presensi `SAKIT` ke `ALPA`. |
+| `GET` | `/sick-letters/{id}/file` | Binary stream | Unduh berkas fisik surat (PDF/JPG/PNG) dengan validasi role dan batas kelas. |
 
 ## 4. Bentuk data utama
 
@@ -203,6 +206,7 @@ Tanggal dan kelas berada pada path agar server memvalidasinya sebagai scope batc
 - **SchoolStudent:** `id`, `nis`, `nama`, `kelasId`, `status` (`active|inactive`).
 - **SchoolTeacher:** `id`, `nip`, `nama`, `status` (`active|inactive`).
 - **SchoolAccount:** `id`, `nama`, `email`, `role`, `kelasId` (nullable), `active`.
+- **SickLetter:** `id`, `date`, `kelasId`, `studentId`, `keterangan`, `fileName`, `fileSize`, `mimeType`, `status` (`PENDING|VALID|INVALID`), `uploadedById`, `verifiedById`, `verifiedAt`, `catatanValidator`, `createdAt`.
 - **AttendanceRecord:** `id`, `date`, `kelasId`, `nis` atau `studentId`, `status`, `waktu`, `keterangan`, `createdBy`, `updatedBy`, `updatedAt`.
 - **Audit entry:** ID, aktor, tindakan, tipe dan ID objek, timestamp server, hasil, request ID, metadata aman.
 

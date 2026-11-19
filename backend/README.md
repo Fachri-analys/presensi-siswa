@@ -20,7 +20,7 @@ Sebagian besar endpoint memakai prefix `/api/v1` dan autentikasi cookie sesi.
 | Monitoring | `/api/v1/monitoring` | Ringkasan presensi lintas kelas untuk Admin dan Guru Piket. |
 | Stats | `/api/v1/stats` | Tren kehadiran, siswa dengan Alpa terbanyak, dan perbandingan kelas untuk Admin dan Guru Piket. |
 | Reports | `/api/v1/reports` | Laporan kelas/siswa, ringkasan, dan ekspor CSV dengan cakupan sesuai peran. |
-| Sick Letters | `/api/v1/sick-letters` | Unggah serta akses berkas surat izin/sakit dengan validasi file dan batas kelas. |
+| Sick Letters | `/api/v1/sick-letters` | Pengelolaan surat sakit: unggah berkas, antrean validasi Guru Piket (`/pending`), verifikasi status (`/validate`), dan unduh berkas. |
 | Audit Logs | `/api/v1/audit-logs` | Log aktivitas untuk Admin dan Guru Piket. |
 | Health | `/health`, `/health/db` | Status API dan koneksi database. Endpoint ini tidak memakai prefix `/api/v1`. |
 

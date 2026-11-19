@@ -1,6 +1,6 @@
 # Sistem Presensi Siswa
 
-Web app untuk mencatat presensi siswa dan membantu sekolah melihat rekap kehadiran. Repository ini berisi frontend Next.js, API NestJS, serta skema dan migrasi SQLite melalui Prisma.
+Sistem presensi siswa berbasis web yang dirancang untuk pencatatan kehadiran harian, monitoring lintas kelas, dan rekapitulasi sekolah dengan kendali akses berbasis peran (RBAC) serta alur validasi surat sakit terverifikasi.
 
 [![CI](https://github.com/Fachri-analys/presensi-siswa/actions/workflows/ci.yml/badge.svg)](https://github.com/Fachri-analys/presensi-siswa/actions)
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016-black?logo=next.js)](https://nextjs.org/)
@@ -9,121 +9,184 @@ Web app untuk mencatat presensi siswa dan membantu sekolah melihat rekap kehadir
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma%206-2D3748?logo=prisma)](https://www.prisma.io/)
 
-## Tampilan
+---
+
+## Tampilan Antarmuka
 
 ![Halaman login Sistem Presensi Siswa](./docs/screenshot-login.png)
 
-## Fitur dan akses pengguna
+---
 
-| Peran | Akses utama |
-|---|---|
-| Admin | Mengelola akun, siswa, guru, kelas, penugasan Ketua Kelas, dan jadwal. Dapat melihat serta mengelola presensi seluruh kelas. |
-| Guru Piket | Melihat data sekolah yang diperlukan untuk piket, mencatat presensi lintas kelas, memberi izin pencatatan Hadir/Terlambat di luar sesi, serta melihat monitoring, laporan, dan log aktivitas. Tidak mengelola akun atau data induk. |
-| Ketua Kelas | Melihat data dan mencatat presensi hanya untuk kelas yang ditugaskan. Dapat melihat riwayat, laporan, dan surat izin/sakit dalam cakupan kelasnya. |
+## Alur dan Hak Akses
 
-Sistem mencatat status Hadir, Terlambat, Izin, Sakit, dan Alpa. Jadwal awal menyediakan sesi pagi dan siang, yang dapat disesuaikan Admin. Fitur lain mencakup monitoring kelas, rekap dan ekspor CSV, pengelolaan akun, serta unggah dan akses berkas surat izin atau sakit.
+Sistem menggunakan model hak akses bertingkat dengan pemisahan wewenang yang tegas:
 
-## Struktur repository
+```mermaid
+flowchart TD
+    subgraph Pengguna["Aktor Pengguna"]
+        KK["Ketua Kelas"]
+        GP["Guru Piket"]
+        ADM["Admin Sekolah"]
+    end
+
+    subgraph Presensi["Pencatatan Presensi"]
+        Sesi{"Jadwal Sesi Aktif?"}
+        Hadir["Hadir / Terlambat"]
+        Izin["Izin / Alpa"]
+        SakitReq{"Surat Sakit Sah?"}
+        Sakit["Status: Sakit"]
+    end
+
+    subgraph Validasi["Alur Surat Sakit"]
+        Upload["Unggah Bukti (PDF/JPG)<br/>Status: PENDING"]
+        Queue["Antrean Validasi Guru Piket"]
+        Decision{"Keputusan"}
+        Approve["Validasi: Sah (VALID)<br/>Presensi otomatis Sakit"]
+        Reject["Tolak: Tidak Sah (INVALID)<br/>Presensi dikembalikan Alpa"]
+    end
+
+    KK -->|"Kelas tugas"| Sesi
+    GP -->|"Lintas kelas / Izin hadir"| Hadir
+    ADM -->|"Kelola data induk"| Presensi
+
+    Sesi -->|Ya| Hadir
+    Sesi -->|Tidak / Terkunci| Izin
+
+    KK --> Upload
+    Upload --> Queue
+    GP --> Queue
+    Queue --> Decision
+    Decision -->|Diterima| Approve
+    Decision -->|Ditolak| Reject
+    Approve --> SakitReq
+    SakitReq -->|Ya| Sakit
+```
+
+### Matriks Akses Pengguna
+
+| Peran | Ruang Lingkup | Akses Utama |
+|---|---|---|
+| **Admin** | Seluruh Sekolah | Pengelolaan akun, data siswa, guru, kelas, jadwal sesi, audit log, serta pengawasan presensi seluruh kelas. |
+| **Guru Piket** | Lintas Kelas | Pencatatan presensi lintas kelas, pemberian izin Hadir di luar sesi per siswa, verifikasi dan validasi berkas surat sakit, monitoring harian, dan laporan. |
+| **Ketua Kelas** | Kelas Penugasan | Pencatatan presensi siswa di kelasnya, pengunggahan surat sakit, pemantauan status validasi surat, serta peninjauan rekap kelas sendiri. |
+
+---
+
+## Struktur Direktori
 
 ```text
 .
-├── app/                     # Halaman Next.js App Router
-├── components/              # Dashboard, presensi, tabel, dan komponen UI
-├── lib/data/                # API client, kontrak, decoder, dan adapter frontend
-├── tests/                   # Unit test frontend
+├── app/                     # Halaman Next.js App Router (route grup & auth)
+├── components/              # Komponen antarmuka (dashboard, presensi, dialog, modal)
+├── lib/data/                # Kontrak DTO, HTTP client, decoder, dan adapter repository
+├── tests/                   # Pengujian unit frontend (Vitest)
 ├── backend/
-│   ├── prisma/              # Skema, migrasi SQLite, dan seed
-│   ├── src/modules/         # Modul API NestJS
-│   └── test/                # Fixture dan test end-to-end
-├── docs/                    # Peta proyek, setup, kontrak API, dan audit
-├── scripts/                 # Deploy dan backup database/unggahan
-├── .github/workflows/ci.yml # CI frontend dan backend
-├── Dockerfile               # Image frontend
-└── docker-compose.production.yml
+│   ├── prisma/              # Skema database, migrasi SQLite, dan berkas seeder
+│   ├── src/modules/         # Modul domain NestJS (auth, attendance, sick-letters, dsb.)
+│   └── test/                # Pengujian integrasi dan end-to-end (Jest)
+├── docs/                    # Spesifikasi API, panduan produksi, dan audit keamanan
+├── scripts/                 # Skrip deployment otomatis dan backup produksi
+├── Dockerfile               # Konfigurasi container produksi Next.js
+└── docker-compose.production.yml # Orkestrasi SQLite, API, Frontend, dan Caddy
 ```
 
-Alur aplikasi: browser memanggil API melalui `lib/data/`; API memeriksa sesi dan peran pengguna, lalu membaca atau mengubah data SQLite melalui Prisma. Akun dan peran berasal dari backend. Detail modul dan alur ada di [peta proyek](./docs/PROJECT-MAP.md).
+---
 
-## Menjalankan secara lokal
+## Menjalankan Aplikasi Secara Lokal
 
 ### Prasyarat
+- **Node.js** `>=22.12.0` dan **npm** `>=10.0.0`
+- Database SQLite lokal (tanpa perlu instalasi server database eksternal)
 
-- Node.js `>=22.12.0` dan npm `>=10`.
-- Database SQLite lokal; tidak memerlukan server database atau Docker.
-
-### Instalasi
+### 1. Instalasi Dependensi & Konfigurasi Lingkungan
 
 ```bash
 git clone https://github.com/Fachri-analys/presensi-siswa.git
 cd presensi-siswa
+
+# Pasang paket frontend dan backend
 npm ci
 npm --prefix backend ci
+
+# Salin konfigurasi environment
 cp .env.example .env.local
 cp backend/.env.example backend/.env
 ```
 
-`backend/.env.example` memakai konfigurasi database lokal. Jika seed juga perlu membuat Admin pertama, isi `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` di `backend/.env`. Password awal minimal 12 karakter dan maksimal 72 byte UTF-8. Seed menyiapkan jadwal pagi dan siang, tetapi tidak membuat akun, guru, kelas, atau siswa contoh.
+> **Catatan Kredensial**: Untuk inisialisasi akun Admin pertama kali, atur `INITIAL_ADMIN_EMAIL` dan `INITIAL_ADMIN_PASSWORD` (minimal 12 karakter memadukan huruf besar, huruf kecil, dan angka/simbol) pada `backend/.env`.
 
-Untuk tes akses role Admin, Guru Piket, dan Ketua Kelas, isi variabel `LOCAL_TEST_*` di `backend/.env` dengan password acak yang kuat, lalu jalankan `npm --prefix backend run local:seed-test-users`. Seeder hanya menyentuh database development `backend/prisma/dev.db`; detailnya ada di [README backend](./backend/README.md). Jangan commit file `.env`.
+### 2. Migrasi Database dan Seed Awal
 
-### Database dan server
-
-Jalankan dari root repository:
+Jalankan seluruh perintah persiapan database langsung dari direktori root:
 
 ```bash
 npm run backend:prisma:generate
-npm --prefix backend run prisma:migrate
+npm run backend:prisma:migrate
 npm run backend:prisma:seed
 ```
 
-Migrasi membuat file SQLite baru pada `backend/prisma/dev.db`. Buka dua terminal dari root repository:
+### 3. Menjalankan Server Development
 
+Buka dua jendela terminal terpisah dari direktori root:
+
+**Terminal 1 — Backend API (Port 4000):**
 ```bash
 npm run backend:dev
 ```
 
+**Terminal 2 — Frontend UI (Port 3000):**
 ```bash
 npm run dev
 ```
 
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- API: [http://localhost:4000/api/v1](http://localhost:4000/api/v1)
-- Health API: [http://localhost:4000/health](http://localhost:4000/health) dan `/health/db`
-- Swagger: [http://localhost:4000/api/docs](http://localhost:4000/api/docs), hanya saat backend bukan production.
+- **Aplikasi Frontend**: [http://localhost:3000](http://localhost:3000)
+- **REST API**: [http://localhost:4000/api/v1](http://localhost:4000/api/v1)
+- **Dokumentasi Swagger API**: [http://localhost:4000/api/docs](http://localhost:4000/api/docs)
+- **Pemeriksaan Kesehatan (Health)**: [http://localhost:4000/health](http://localhost:4000/health)
 
-## Pemeriksaan
+---
+
+## Pengujian dan Kualitas Kode
+
+Sistem dilengkapi pengujian otomatis menyeluruh pada frontend dan backend:
 
 ```bash
-npm run lint
-npm run typecheck
+# Pengujian Frontend (Vitest)
 npm test
-npm --prefix backend run lint
+npm run typecheck
+npm run lint
+
+# Pengujian Backend (Jest & Prisma)
+npm run backend:test
 npm --prefix backend run typecheck
-npm --prefix backend test
+npm --prefix backend run lint
 ```
 
-Test end-to-end backend memakai file SQLite terpisah `backend/prisma/presensi_test.db` dan fixture khusus test; file ini tidak sama dengan database development.
+---
 
-GitHub Actions menjalankan install bersih, audit dependency, lint, typecheck, unit test, migrasi SQLite, test end-to-end, build aplikasi, validasi Compose, dan build image. Workflow berjalan pada push ke `main`, `production-ready`, dan `feature/**`, pull request ke `main`, serta dapat dijalankan manual. CI tidak melakukan deploy ke server.
+## Deployment Produksi
 
-## Deployment
-
-Template production memakai Docker Compose pada satu server: file SQLite pada named volume persisten, API, frontend, dan Caddy untuk HTTPS. SQLite sesuai untuk satu instance API; siapkan domain, DNS, dan firewall sebelum deploy. Petunjuk konfigurasi dan perintahnya ada di [Setup Production](./docs/PRODUCTION-SETUP.md).
+Deployment menggunakan Docker Compose dengan arsitektur satu server yang efisien: Caddy sebagai reverse proxy dengan TLS otomatis, frontend Next.js, backend NestJS, dan SQLite pada volume persisten terisolasi.
 
 ```bash
 cp .env.production.example .env.production
 chmod 600 .env.production
-# Isi variabel production, lalu:
+
+# Jalankan skrip deployment mandiri
 ./scripts/deploy-production.sh
 ```
 
-Backup database dan berkas unggahan dapat dijalankan melalui `./scripts/backup-production.sh`. Atur lokasi backup offsite dan uji pemulihan sebelum dipakai sebagai prosedur operasional. Status temuan keamanan dan pekerjaan setup yang tersisa tercatat di [Security Audit](./docs/SECURITY-AUDIT.md).
+Cadangan berkas database dan dokumen surat dapat dijalankan secara berkala melalui:
+```bash
+./scripts/backup-production.sh
+```
 
-## Dokumentasi
+---
 
-- [Peta proyek](./docs/PROJECT-MAP.md)
-- [Dokumentasi produk dan sistem](./docs/README.md)
-- [Kontrak API](./docs/API-CONTRACT.md)
-- [Backend API](./backend/README.md)
-- [Setup production](./docs/PRODUCTION-SETUP.md)
-- [Audit keamanan](./docs/SECURITY-AUDIT.md)
+## Referensi Dokumentasi
+
+- [Peta Proyek & Arsitektur](./docs/PROJECT-MAP.md)
+- [Spesifikasi Kontrak API](./docs/API-CONTRACT.md)
+- [Dokumentasi Modul Backend](./backend/README.md)
+- [Panduan Setup Produksi](./docs/PRODUCTION-SETUP.md)
+- [Laporan Audit Keamanan](./docs/SECURITY-AUDIT.md)
