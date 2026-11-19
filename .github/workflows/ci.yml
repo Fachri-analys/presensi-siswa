@@ -23,10 +23,10 @@ jobs:
       NEXT_PUBLIC_API_BASE_URL: https://api.example.invalid/api/v1/
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -52,7 +52,7 @@ jobs:
       - name: Validate production Compose configuration
         run: |
           cp .env.production.example .env.production
-          bash -n scripts/deploy-production.sh scripts/backup-production.sh scripts/ensure-runtime-db-user.sh
+          bash -n scripts/deploy-production.sh scripts/backup-production.sh
           docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
           rm .env.production
 
@@ -67,15 +67,15 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: file:./presensi_test.db
       PORT: 4000
-      TEST_ADMIN_PASSWORD: test-admin-${{ github.run_id }}-Password
-      TEST_GURU_PASSWORD: test-guru-${{ github.run_id }}-Password
-      TEST_KETUA_PASSWORD: test-ketua-${{ github.run_id }}-Password
+      TEST_ADMIN_PASSWORD: Test-Admin-${{ github.run_id }}-Pass!123
+      TEST_GURU_PASSWORD: Test-Guru-${{ github.run_id }}-Pass!123
+      TEST_KETUA_PASSWORD: Test-Ketua-${{ github.run_id }}-Pass!123
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -136,7 +136,7 @@ jobs:
     needs: [frontend, backend]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Prepare isolated production environment
         run: |
